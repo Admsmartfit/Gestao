@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Administração de Unidades</h2>
+    <p class="text-muted">Defina aqui as faixas de IP permitidas para check-in.</p>
+
+    <div class="card shadow">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome da Unidade</th>
+                        <th>Endereço</th>
+                        <th>Faixa de IP Permitida</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in unidades %}
+                    <tr>
+                        <td>{{ u.id }}</td>
+                        <td>{{ u.nome }}</td>
+                        <td>{{ u.endereco }}</td>
+                        <td>
+                            <form action="{{ url_for('admin.gerenciar_unidades') }}" method="POST" class="d-flex">
+                                <input type="hidden" name="unidade_id" value="{{ u.id }}">
+                                <input type="text" name="faixa_ip" value="{{ u.faixa_ip_permitida }}"
+                                    class="form-control form-control-sm me-2" style="width: 150px;">
+                                <button type="submit" class="btn btn-primary btn-sm">Salvar</button>
+                            </form>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if u.ativa else 'danger' }}">
+                                {{ 'Ativa' if u.ativa else 'Inativa' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-3">
+        <strong>Dica:</strong> Para permitir check-in local (na mesma máquina do servidor), use a faixa
+        <code>127.0.0</code>.
+    </div>
+</div>
+{% endblock %}

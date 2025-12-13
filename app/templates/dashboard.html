@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+
+        <div class="col-md-3 mb-4">
+
+            {% if current_user.tipo == 'tecnico' %}
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-dark text-white py-2">
+                    <small><i class="bi bi-clock"></i> Meu Ponto</small>
+                </div>
+                <div class="card-body text-center p-3">
+                    {% if registro_aberto %}
+                    <div class="badge bg-success mb-2 w-100">TRABALHANDO</div>
+                    <p class="small text-muted mb-2">Entrada: {{ registro_aberto.data_hora_entrada.strftime('%H:%M') }}
+                    </p>
+
+                    <form action="{{ url_for('ponto.checkout') }}" method="POST">
+                        <input type="hidden" name="registro_id" value="{{ registro_aberto.id }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                            Encerrar Expediente
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="badge bg-secondary mb-2 w-100">AUSENTE</div>
+                    <form action="{{ url_for('ponto.checkin') }}" method="POST">
+                        <select name="unidade_id" class="form-select form-select-sm mb-2" required>
+                            <option value="" selected disabled>Unidade...</option>
+                            {% for u in unidades %}
+                            <option value="{{ u.id }}">{{ u.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            Iniciar Expediente
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="d-grid gap-2">
+                <a href="{{ url_for('os.nova_os') }}" class="btn btn-success py-3 shadow-sm">
+                    <i class="bi bi-plus-circle-fill fs-4 d-block"></i>
+                    Nova Ordem de Serviço
+                </a>
+            </div>
+
+            <div class="card mt-3 border-0 bg-light">
+                <div class="card-body py-2">
+                    <small class="text-muted fw-bold">RESUMO HOJE</small>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span>Pendentes:</span>
+                        <span class="badge bg-warning text-dark">
+                            {{ minhas_os | selectattr("status", "equalto", "aberta") | list | length }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="card shadow border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-primary"><i class="bi bi-tools"></i> Acompanhar Ordens de Serviço</h5>
+                    <div class="input-group input-group-sm w-25">
+                        <input type="text" class="form-control" placeholder="Buscar OS...">
+                        <button class="btn btn-outline-secondary"><i class="bi bi-search"></i></button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th># OS</th>
+                                    <th>Unidade</th>
+                                    <th>Equipamento</th>
+                                    <th>Status</th>
+                                    <th>Prioridade</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for os in minhas_os %}
+                                <tr>
+                                    <td class="fw-bold text-secondary">{{ os.numero_os }}</td>
+                                    <td><small>{{ os.unidade.nome }}</small></td>
+                                    <td>{{ os.equipamento }}</td>
+                                    <td>
+                                        {% if os.status == 'aberta' %}
+                                        <span class="badge bg-warning text-dark">Aberta</span>
+                                        {% elif os.status == 'concluida' %}
+                                        <span class="badge bg-success">Concluída</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ os.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if os.prioridade == 'urgente' %}
+                                        <span class="badge bg-danger">URGENTE</span>
+                                        {% elif os.prioridade == 'alta' %}
+                                        <span class="badge bg-orange text-dark"
+                                            style="background-color: #fd7e14;">Alta</span>
+                                        {% else %}
+                                        <span class="badge bg-info text-dark">Normal</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('os.detalhes', id=os.id) }}"
+                                            class="btn btn-sm btn-outline-primary">
+                                            Ver Detalhes
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <i class="bi bi-emoji-smile"></i> Nenhuma ordem de serviço encontrada.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

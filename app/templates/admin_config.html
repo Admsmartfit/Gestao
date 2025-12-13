@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-gear-fill"></i> Painel Administrativo</h2>
+        <a href="{{ url_for('ponto.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar ao Dashboard
+        </a>
+    </div>
+
+    <p class="text-muted">Gerencie técnicos, equipamentos, unidades e fornecedores.</p>
+
+    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'tecnicos' %}active{% endif %}" data-bs-toggle="tab"
+                data-bs-target="#tecnicos">Técnicos</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'equipamentos' %}active{% endif %}" data-bs-toggle="tab"
+                data-bs-target="#equipamentos">Equipamentos</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'unidades' %}active{% endif %}" data-bs-toggle="tab"
+                data-bs-target="#unidades">Unidades</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'fornecedores' %}active{% endif %}" data-bs-toggle="tab"
+                data-bs-target="#fornecedores">Fornecedores</button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <div class="tab-pane fade {% if active_tab == 'tecnicos' %}show active{% endif %}" id="tecnicos">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white fw-bold">Cadastrar Novo Funcionário</div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin.novo_usuario') }}" method="POST">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Nome Completo</label>
+                                <input type="text" name="nome" class="form-control" required>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Nome de Usuário (Login)</label>
+                                <input type="text" name="username" class="form-control" placeholder="Ex: joao.silva"
+                                    required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Senha</label>
+                                <input type="password" name="senha" class="form-control" required>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Função / Cargo</label>
+                                <select name="tipo" class="form-select" required>
+                                    <option value="tecnico">Técnico</option>
+                                    <option value="prestador">Prestador de Serviço</option>
+                                    <option value="gerente">Gerente de Unidade</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="email" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Telefone</label>
+                                <input type="text" name="telefone" class="form-control" placeholder="(xx) xxxxx-xxxx">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Unidade Principal</label>
+                                <select name="unidade_id" class="form-select">
+                                    <option value="">Nenhuma / Global</option>
+                                    {% for u in unidades %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-success w-100">Salvar</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <h5>Quadro de Funcionários</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Login</th>
+                            <th>Função</th>
+                            <th>Contato</th>
+                            <th>Unidade</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in funcionarios %}
+                        <tr>
+                            <td>{{ f.nome }}</td>
+                            <td class="fw-bold">{{ f.username }}</td>
+                            <td>
+                                {% if f.tipo == 'admin' %}<span class="badge bg-dark">Admin</span>{% endif %}
+                                {% if f.tipo == 'gerente' %}<span class="badge bg-primary">Gerente</span>{% endif %}
+                                {% if f.tipo == 'tecnico' %}<span class="badge bg-info text-dark">Técnico</span>{% endif
+                                %}
+                                {% if f.tipo == 'prestador' %}<span class="badge bg-secondary">Prestador</span>{% endif
+                                %}
+                            </td>
+                            <td>
+                                <small>{{ f.email or '-' }}<br>{{ f.telefone or '-' }}</small>
+                            </td>
+                            <td>{{ f.unidade_padrao_id or 'Global' }}</td>
+                            <td>
+                                <a href="{{ url_for('admin.excluir_tecnico', id=f.id) }}"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Excluir {{ f.nome }}?')"><i class="bi bi-trash"></i></a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade {% if active_tab == 'equipamentos' %}show active{% endif %}" id="equipamentos">
+            <div class="card mb-4 border-warning">
+                <div class="card-header bg-warning text-dark fw-bold">Novo Equipamento</div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin.novo_equipamento') }}" method="POST" class="row g-3">
+                        <div class="col-md-4"><input type="text" name="nome" class="form-control"
+                                placeholder="Ex: Esteira T50" required></div>
+                        <div class="col-md-3">
+                            <select name="categoria" class="form-select" required>
+                                <option value="cardio">Cardio</option>
+                                <option value="musculacao">Musculação</option>
+                                <option value="predial">Predial</option>
+                                <option value="diversos">Diversos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select name="unidade_id" class="form-select" required>
+                                {% for u in unidades %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2"><button type="submit" class="btn btn-warning w-100">Salvar</button></div>
+                    </form>
+                </div>
+            </div>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Categoria</th>
+                        <th>Unidade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in equipamentos %}
+                    <tr>
+                        <td>{{ e.nome }}</td>
+                        <td>{{ e.categoria }}</td>
+                        <td>{{ e.unidade.nome }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="tab-pane fade {% if active_tab == 'unidades' %}show active{% endif %}" id="unidades">
+            <div class="card border-info mb-4">
+                <div class="card-header bg-info text-white fw-bold">Nova Unidade</div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin.nova_unidade') }}" method="POST" class="row g-3">
+                        <div class="col-md-4"><input type="text" name="nome" class="form-control" placeholder="Nome"
+                                required></div>
+                        <div class="col-md-4"><input type="text" name="endereco" class="form-control"
+                                placeholder="Endereço"></div>
+                        <div class="col-md-2"><input type="text" name="faixa_ip" class="form-control" placeholder="IPs"
+                                required></div>
+                        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Adicionar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Endereço</th>
+                        <th>IPs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in unidades %}
+                    <tr>
+                        <td>{{ u.nome }}</td>
+                        <td>{{ u.endereco }}</td>
+                        <td>{{ u.faixa_ip_permitida }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="tab-pane fade {% if active_tab == 'fornecedores' %}show active{% endif %}" id="fornecedores">
+            <div class="row">
+
+                <div class="col-md-5">
+                    <div class="card mb-4 shadow-sm border-dark">
+                        <div class="card-header bg-dark text-white">
+                            <i class="bi bi-shop"></i> 1. Cadastrar Fornecedor
+                        </div>
+                        <div class="card-body">
+                            <form action="{{ url_for('admin.novo_fornecedor') }}" method="POST">
+                                <div class="mb-3">
+                                    <label class="form-label">Nome / Razão Social</label>
+                                    <input type="text" name="nome" class="form-control" required>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" name="email" class="form-control">
+                                    </div>
+                                    <div class="col">
+                                        <label class="form-label">Telefone</label>
+                                        <input type="text" name="telefone" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Prazo Médio Inicial (Dias)</label>
+                                    <input type="number" name="prazo_inicial" class="form-control" value="7">
+                                </div>
+                                <button type="submit" class="btn btn-dark w-100">Salvar Fornecedor</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+
+                    <div class="card mb-4 shadow-sm border-success">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-box-seam"></i> 2. Cadastrar Nova Peça (Estoque)
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-2">Use isto se a peça ainda não existe no sistema.</p>
+                            <form action="{{ url_for('admin.novo_item_estoque') }}" method="POST"
+                                class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Código</label>
+                                    <input type="text" name="codigo" class="form-control form-control-sm"
+                                        placeholder="Ex: ROL-99" required>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="small fw-bold">Nome da Peça</label>
+                                    <input type="text" name="nome" class="form-control form-control-sm"
+                                        placeholder="Ex: Rolamento XYZ" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="small fw-bold">Unidade</label>
+                                    <select name="unidade_medida" class="form-select form-select-sm">
+                                        <option value="UN">UN</option>
+                                        <option value="MT">MT</option>
+                                        <option value="KG">KG</option>
+                                        <option value="L">L</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-success btn-sm w-100">Salvar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4 shadow-sm border-secondary">
+                        <div class="card-header bg-secondary text-white">
+                            <i class="bi bi-link-45deg"></i> 3. Vincular Peça ao Fornecedor
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-2">Define quem fornece o quê, e o preço/prazo acordado.</p>
+                            <form action="{{ url_for('admin.vincular_peca_fornecedor') }}" method="POST">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Fornecedor</label>
+                                        <select name="fornecedor_id" class="form-select" required>
+                                            <option value="" selected disabled>Selecione...</option>
+                                            {% for f in fornecedores %}
+                                            <option value="{{ f.id }}">{{ f.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Peça (Estoque)</label>
+                                        <select name="estoque_id" class="form-select" required>
+                                            <option value="" selected disabled>Selecione...</option>
+                                            {% for item in estoque_itens %}
+                                            <option value="{{ item.id }}">{{ item.nome }} ({{ item.codigo }})</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <input type="number" name="preco" step="0.01" class="form-control"
+                                            placeholder="Preço (R$)">
+                                    </div>
+                                    <div class="col">
+                                        <input type="number" name="prazo" class="form-control"
+                                            placeholder="Prazo (Dias)">
+                                    </div>
+                                    <div class="col">
+                                        <button type="submit" class="btn btn-secondary w-100">Vincular</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <h5 class="mt-4 border-bottom pb-2">Catálogo de Fornecedores Cadastrados</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fornecedor</th>
+                            <th>Contato</th>
+                            <th>Prazo Médio Real</th>
+                            <th>Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in fornecedores %}
+                        <tr>
+                            <td class="fw-bold">{{ f.nome }}</td>
+                            <td>{{ f.email }} | {{ f.telefone }}</td>
+                            <td>
+                                <span class="badge bg-info text-dark">
+                                    {{ "{:.1f}".format(f.prazo_medio_entrega_dias) }} dias
+                                </span>
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ f.total_pedidos_entregues }} entregas registradas</small>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">Nenhum registro encontrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

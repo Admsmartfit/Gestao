@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>{{ os.numero_os }}
+                {% if os.status == 'aberta' %}
+                <span class="badge bg-warning text-dark">Aberta</span>
+                {% elif os.status == 'concluida' %}
+                <span class="badge bg-success">Concluída</span>
+                {% else %}
+                <span class="badge bg-secondary">{{ os.status }}</span>
+                {% endif %}
+            </h2>
+            <p class="text-muted mb-0">
+                <i class="bi bi-geo-alt"></i> {{ os.unidade.nome }} |
+                <i class="bi bi-person"></i> {{ os.tecnico.nome }}
+            </p>
+        </div>
+
+        <div class="text-end">
+            <h4>Custo Total: R$ <span id="custoTotal">{{ "{:.2f}".format(os.custo_total) }}</span></h4>
+            {% if os.prazo_conclusao %}
+            <small class="text-danger fw-bold">Prazo: {{ os.prazo_conclusao.strftime('%d/%m/%Y %H:%M') }}</small>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light fw-bold">Detalhes do Serviço</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Equipamento:</strong>
+                                {% if os.equipamento_rel %}
+                                {{ os.equipamento_rel.nome }} <span class="badge bg-info text-dark">{{
+                                    os.equipamento_rel.categoria }}</span>
+                                {% else %}
+                                <span class="text-muted">Não vinculado</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Prioridade:</strong> {{ os.prioridade|upper }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Tipo:</strong> {{ os.tipo_manutencao|title }}</p>
+                            <p><strong>Problema Relatado:</strong><br> {{ os.descricao_problema }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-12 mb-4">
+            <h5>Fotos Iniciais</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                {% if os.fotos_antes %}
+                {% for foto in os.fotos_antes %}
+                <a href="{{ url_for('static', filename=foto) }}" target="_blank">
+                    <img src="{{ url_for('static', filename=foto) }}" class="img-thumbnail"
+                        style="height: 120px; object-fit: cover;">
+                </a>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted">Sem fotos registradas.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
+            <h5 class="mb-0"><i class="bi bi-tools"></i> Peças e Materiais</h5>
+            <div>
+                <button class="btn btn-warning btn-sm me-2" data-bs-toggle="modal"
+                    data-bs-target="#modalSolicitarCompra">
+                    <i class="bi bi-truck"></i> Solicitar Peça Externa
+                </button>
+
+                {% if os.status != 'concluida' %}
+                <div class="d-flex justify-content-end gap-2 mb-5">
+                    <button class="btn btn-outline-danger">Cancelar OS</button>
+
+                    <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#modalConcluir">
+                        <i class="bi bi-check2-all"></i> Concluir Serviço
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Peça</th>
+                            <th>Qtd Utilizada</th>
+                            <th>Custo Unit.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in os.movimentacoes %}
+                        {% if mov.tipo_movimentacao == 'consumo' %}
+                        <tr>
+                            <td>{{ mov.estoque.nome }}</td>
+                            <td>{{ mov.quantidade }} {{ mov.estoque.unidade_medida }}</td>
+                            <td>R$ {{ mov.estoque.valor_unitario }}</td>
+                            <td>R$ {{ (mov.quantidade * mov.estoque.valor_unitario) | round(2) }}</td>
+                        </tr>
+                        {% endif %}
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">Nenhuma peça utilizada até o momento.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if os.status != 'concluida' %}
+    <div class="d-flex justify-content-end gap-2 mb-5">
+        <button class="btn btn-outline-danger">Cancelar OS</button>
+        <button class="btn btn-primary btn-lg">
+            <i class="bi bi-check2-all"></i> Concluir Serviço
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="modalPeca" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Peça do Estoque</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label>Buscar Peça</label>
+                    <input type="text" id="buscaPeca" class="form-control" placeholder="Digite o nome...">
+                    <div id="listaSugestoes" class="list-group mt-1"></div>
+                </div>
+                <input type="hidden" id="estoqueIdSelecionado">
+                <div class="mb-3">
+                    <label>Quantidade (<span id="unidadeMedida">UN</span>)</label>
+                    <input type="number" id="qtdPeca" class="form-control" step="0.001" min="0.001">
+                    <small class="text-muted">Saldo disponível: <span id="saldoAtual">-</span></small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" onclick="salvarPeca()">Adicionar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalConcluir" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Finalizar Ordem de Serviço</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('os.concluir_os', id=os.id) }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="fw-bold">Solução Aplicada</label>
+                        <textarea name="descricao_solucao" class="form-control" rows="4" required
+                            placeholder="Descreva o que foi feito para resolver o problema..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="fw-bold">Fotos do Resultado (Opcional)</label>
+                        <input type="file" name="fotos_depois" class="form-control" multiple accept="image/*">
+                        <small class="text-muted">Registre como ficou o equipamento após o conserto.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Voltar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Conclusão</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- LÓGICA DO ESTOQUE INTERNO (Busca AJAX) ---
+    document.getElementById('buscaPeca').addEventListener('input', async function (e) {
+        if (this.value.length < 2) return;
+        const res = await fetch(`/os/api/pecas/buscar?q=${this.value}`);
+        const data = await res.json();
+
+        const lista = document.getElementById('listaSugestoes');
+        lista.innerHTML = '';
+
+        data.forEach(peca => {
+            const item = document.createElement('a');
+            item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+            item.innerHTML = `<span>${peca.nome}</span> <span class="badge bg-secondary">${peca.saldo} ${peca.unidade}</span>`;
+            item.style.cursor = 'pointer';
+            item.onclick = () => selecionarPeca(peca);
+            lista.appendChild(item);
+        });
+    });
+
+    function selecionarPeca(peca) {
+        document.getElementById('buscaPeca').value = peca.nome;
+        document.getElementById('estoqueIdSelecionado').value = peca.id;
+        document.getElementById('unidadeMedida').innerText = peca.unidade;
+        document.getElementById('saldoAtual').innerText = peca.saldo;
+        document.getElementById('listaSugestoes').innerHTML = '';
+    }
+
+    async function salvarPeca() {
+        const payload = {
+            estoque_id: document.getElementById('estoqueIdSelecionado').value,
+            quantidade: document.getElementById('qtdPeca').value
+        };
+
+        const res = await fetch(`/os/{{ os.id }}/adicionar-peca`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.erro);
+    }
+
+    // --- LÓGICA DO FORNECEDOR (Módulo 3) ---
+    async function buscarFornecedores(pecaId) {
+        if (!pecaId) return;
+
+        // Chama a nova API do Admin
+        const resp = await fetch(`/admin/api/fornecedores/buscar-por-peca/${pecaId}`);
+        const fornecedores = await resp.json();
+
+        const area = document.getElementById('areaFornecedores');
+        const tbody = document.getElementById('tabelaFornecedoresBody');
+        tbody.innerHTML = '';
+
+        if (fornecedores.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum fornecedor cadastrado para esta peça. Contate o Gerente.</td></tr>';
+        } else {
+            fornecedores.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td><strong>${f.nome}</strong></td>
+                <td class="text-primary fw-bold">~${f.prazo_medio_geral} dias</td>
+                <td><small>${f.historico_entregas} entregas realizadas</small></td>
+                <td>R$ ${f.preco.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-sm btn-success" onclick="alert('Pedido de compra enviado para aprovação!')">
+                        <i class="bi bi-cart-check"></i> Solicitar
+                    </button>
+                </td>
+            `;
+                tbody.appendChild(tr);
+            });
+        }
+        area.style.display = 'block';
+    }
+</script>
+{% endblock %}

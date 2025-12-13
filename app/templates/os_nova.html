@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Nova Ordem de Serviço</h2>
+
+    <form method="POST" enctype="multipart/form-data" id="formOS">
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-geo-alt-fill"></i> 1. Localização e Equipamento
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">1. Selecione a Unidade</label>
+                        <select name="unidade_id" id="selectUnidade" class="form-select" required
+                            onchange="carregarEquipamentos()">
+                            <option value="" disabled selected>Escolha a unidade...</option>
+                            {% for u in unidades %}
+                            <option value="{{ u.id }}">{{ u.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">O técnico só pode atender na unidade presente.</small>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Técnico Responsável</label>
+                        <select name="tecnico_id" class="form-select" required>
+                            {% for t in tecnicos %}
+                            <option value="{{ t.id }}" {% if t.id==current_user.id %}selected{% endif %}>{{ t.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <hr>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">2. Tipo de Equipamento</label>
+                        <select id="selectCategoria" class="form-select" onchange="carregarEquipamentos()">
+                            <option value="" selected>Todos os Tipos</option>
+                            <option value="cardio">Cardio (Esteiras, Bikes)</option>
+                            <option value="musculacao">Musculação</option>
+                            <option value="predial">Predial (Ar, Luz, etc.)</option>
+                            <option value="diversos">Diversos</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label fw-bold">3. Selecione o Equipamento</label>
+                        <select name="equipamento_id" id="selectEquipamento" class="form-select" required disabled>
+                            <option value="">Selecione primeiro a Unidade...</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <hr>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="text-danger fw-bold">Prazo Limite para Conclusão</label>
+                        <input type="datetime-local" name="prazo_conclusao" class="form-control border-danger" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label>Prioridade</label>
+                        <select name="prioridade" class="form-select">
+                            <option value="baixa">Baixa</option>
+                            <option value="media" selected>Média</option>
+                            <option value="alta">Alta</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <i class="bi bi-tools"></i> 2. Detalhes do Problema
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Tipo de Manutenção</label>
+                    <select name="tipo_manutencao" class="form-select">
+                        <option value="corretiva">Corretiva (Quebrou)</option>
+                        <option value="preventiva">Preventiva (Revisão)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Descrição Detalhada do Problema</label>
+                    <textarea name="descricao_problema" class="form-control" rows="4" required
+                        placeholder="Descreva o defeito, barulhos, códigos de erro..."></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Fotos (Antes do Serviço)</label>
+                    <input type="file" name="fotos_antes" class="form-control" multiple accept="image/*"
+                        id="inputFotos">
+                    <div id="previewFotos" class="d-flex mt-2 gap-2 flex-wrap"></div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-circle-fill"></i> Criar Ordem de Serviço
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Lógica para carregar equipamentos via AJAX
+    async function carregarEquipamentos() {
+        const unidadeId = document.getElementById('selectUnidade').value;
+        const categoria = document.getElementById('selectCategoria').value;
+        const selectEquip = document.getElementById('selectEquipamento');
+
+        // Se não tiver unidade selecionada, bloqueia o campo
+        if (!unidadeId) {
+            selectEquip.innerHTML = '<option value="">Selecione primeiro a Unidade...</option>';
+            selectEquip.disabled = true;
+            return;
+        }
+
+        // Estado de carregamento
+        selectEquip.disabled = true;
+        selectEquip.innerHTML = '<option>Carregando equipamentos...</option>';
+
+        try {
+            // Monta URL da API criada no backend
+            let url = `/os/api/equipamentos/filtro?unidade_id=${unidadeId}`;
+            if (categoria) {
+                url += `&categoria=${categoria}`;
+            }
+
+            const response = await fetch(url);
+            const equipamentos = await response.json();
+
+            // Limpa e popula
+            selectEquip.innerHTML = '<option value="" selected disabled>Escolha o equipamento...</option>';
+
+            if (equipamentos.length === 0) {
+                selectEquip.innerHTML += '<option value="" disabled>Nenhum equipamento encontrado nesta categoria.</option>';
+            } else {
+                equipamentos.forEach(eq => {
+                    const option = document.createElement('option');
+                    option.value = eq.id;
+                    option.text = eq.nome;
+                    selectEquip.appendChild(option);
+                });
+            }
+            selectEquip.disabled = false;
+
+        } catch (error) {
+            console.error('Erro:', error);
+            selectEquip.innerHTML = '<option>Erro ao carregar lista.</option>';
+        }
+    }
+
+    // Lógica simples para preview de fotos
+    document.getElementById('inputFotos').addEventListener('change', function (e) {
+        const container = document.getElementById('previewFotos');
+        container.innerHTML = '';
+        for (let file of this.files) {
+            let reader = new FileReader();
+            reader.onload = function (event) {
+                let img = document.createElement('img');
+                img.src = event.target.result;
+                img.style.height = '100px';
+                img.className = 'img-thumbnail';
+                container.appendChild(img);
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+{% endblock %}
