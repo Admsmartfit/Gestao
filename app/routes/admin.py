@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.models.models import Unidade, Usuario
-from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque
+from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico
 from app.extensions import db
+from sqlalchemy import func
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -34,6 +35,21 @@ def dashboard():
     equipamentos = Equipamento.query.all()
     fornecedores = Fornecedor.query.all()
     estoque_itens = Estoque.query.all()
+
+    os_concluidas = OrdemServico.query.filter(
+        OrdemServico.status == 'concluida',
+        OrdemServico.tipo_manutencao == 'corretiva',
+        OrdemServico.data_conclusao != None
+    ).all()
+    
+    total_horas = 0
+    qtd_os = len(os_concluidas)
+    
+    for os_obj in os_concluidas:
+        diff = os_obj.data_conclusao - os_obj.data_abertura
+        total_horas += diff.total_seconds() / 3600
+        
+    mttr = round(total_horas / qtd_os, 1) if qtd_os > 0 else 0
     
     return render_template('admin_config.html', 
                          unidades=unidades, 
@@ -41,6 +57,8 @@ def dashboard():
                          equipamentos=equipamentos,
                          fornecedores=fornecedores,
                          estoque_itens=estoque_itens,
+                         kpi_mttr=mttr,
+                         kpi_os_concluidas=qtd_os,
                          active_tab=active_tab)
 
 # ==============================================================================

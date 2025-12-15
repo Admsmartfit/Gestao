@@ -30,6 +30,25 @@
         </li>
     </ul>
 
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ kpi_mttr }} h</h3>
+                    <small>MTTR (Tempo Médio Reparo)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>{{ kpi_os_concluidas }}</h3>
+                    <small>Manutenções Corretivas Feitas</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="tab-content">
 
         <div class="tab-pane fade {% if active_tab == 'tecnicos' %}show active{% endif %}" id="tecnicos">

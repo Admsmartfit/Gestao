@@ -86,6 +86,25 @@ class AnexosOS(db.Model):
     tamanho_kb = db.Column(db.Integer)
     upload_em = db.Column(db.DateTime, default=datetime.utcnow)
 
+# ... (imports existentes) ...
+
+class PlanoManutencao(db.Model):
+    __tablename__ = 'planos_manutencao'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(150), nullable=False) # Ex: "Lubrificação Semanal"
+    
+    # Pode ser por Categoria (todas as esteiras) ou Equipamento Específico
+    categoria_equipamento = db.Column(db.String(50), nullable=True) 
+    equipamento_id = db.Column(db.Integer, db.ForeignKey('equipamentos.id'), nullable=True)
+    
+    frequencia_dias = db.Column(db.Integer, nullable=False) # Ex: 7, 15, 30
+    ultima_execucao = db.Column(db.DateTime, nullable=True)
+    
+    descricao_procedimento = db.Column(db.Text) # Checklist JSON ou Texto
+    ativo = db.Column(db.Boolean, default=True)
+
+    equipamento = db.relationship('Equipamento', backref='planos')
+
 class MovimentacaoEstoque(db.Model):
     __tablename__ = 'movimentacoes_estoque'
     id = db.Column(db.Integer, primary_key=True)
