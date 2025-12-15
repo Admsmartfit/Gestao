@@ -17,6 +17,10 @@ class Terceirizado(db.Model):
     ativo = db.Column(db.Boolean, default=True)
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # [Novo] Vinculação à Unidade (ou Null para Global)
+    unidade_id = db.Column(db.Integer, db.ForeignKey('unidades.id'), nullable=True)
+    unidade = db.relationship('Unidade', backref='terceirizados')
 
 class ChamadoExterno(db.Model):
     __tablename__ = 'chamados_externos'

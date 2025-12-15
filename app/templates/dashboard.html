@@ -20,14 +20,21 @@
                 </form>
                 {% else %}
                 <span class="badge bg-secondary mb-3 align-self-center">Ausente</span>
-                <form action="{{ url_for('ponto.checkin') }}" method="POST">
+
+                <form action="{{ url_for('ponto.checkin') }}" method="POST" id="formCheckin">
+                    <input type="hidden" name="latitude" id="lat">
+                    <input type="hidden" name="longitude" id="lon">
+
                     <select name="unidade_id" class="form-select mb-3" required>
                         <option value="" selected disabled>Selecionar Unidade</option>
                         {% for u in unidades %}
                         <option value="{{ u.id }}">{{ u.nome }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit" class="btn btn-primary w-100">Registrar Entrada</button>
+
+                    <button type="button" onclick="getLocationAndSubmit()" class="btn btn-primary w-100">
+                        <i class="bi bi-geo-alt me-2"></i> Registrar Entrada
+                    </button>
                 </form>
                 {% endif %}
             </div>
@@ -119,4 +126,47 @@
         </div>
     </div>
 </div>
+
+<script>
+    function getLocationAndSubmit() {
+        const btn = document.querySelector('#formCheckin button');
+        const form = document.getElementById('formCheckin');
+
+        // Bloqueia botão e muda texto para feedback visual
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Obtendo Localização...';
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                // Sucesso: Preenche os inputs hidden
+                document.getElementById('lat').value = position.coords.latitude;
+                document.getElementById('lon').value = position.coords.longitude;
+
+                // Submete o formulário
+                form.submit();
+            }, function (error) {
+                // Erro: Alerta o usuário e libera o botão (pode-se optar por impedir o checkin aqui)
+                let msg = "Erro desconhecido.";
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        msg = "Permissão de localização negada.";
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        msg = "Localização indisponível.";
+                        break;
+                    case error.TIMEOUT:
+                        msg = "Tempo esgotado para obter localização.";
+                        break;
+                }
+                alert("Erro ao obter localização: " + msg);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-geo-alt me-2"></i> Registrar Entrada';
+            });
+        } else {
+            alert("Geolocalização não suportada neste navegador.");
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-geo-alt me-2"></i> Registrar Entrada';
+        }
+    }
+</script>
 {% endblock %}

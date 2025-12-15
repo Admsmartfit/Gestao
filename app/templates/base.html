@@ -29,9 +29,7 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('os.painel_estoque') }}">Estoque</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('terceirizados.listar_chamados') }}">Tarefas Externas</a>
-                    </li>
+
 
                     {% if current_user.tipo == 'admin' %}
                     <li class="nav-item">

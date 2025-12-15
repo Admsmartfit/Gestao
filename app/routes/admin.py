@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.models.models import Unidade, Usuario
 from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico
+from app.models.terceirizados_models import Terceirizado
 from app.extensions import db
 from sqlalchemy import func
 
@@ -35,6 +36,8 @@ def dashboard():
     equipamentos = Equipamento.query.all()
     fornecedores = Fornecedor.query.all()
     estoque_itens = Estoque.query.all()
+    # [Novo] Carrega prestadores de serviço
+    terceirizados = Terceirizado.query.order_by(Terceirizado.nome).all()
 
     os_concluidas = OrdemServico.query.filter(
         OrdemServico.status == 'concluida',
@@ -57,6 +60,7 @@ def dashboard():
                          equipamentos=equipamentos,
                          fornecedores=fornecedores,
                          estoque_itens=estoque_itens,
+                         terceirizados=terceirizados,
                          kpi_mttr=mttr,
                          kpi_os_concluidas=qtd_os,
                          active_tab=active_tab)
@@ -250,6 +254,52 @@ def vincular_peca_fornecedor():
     db.session.commit()
     flash(msg, 'success')
     return redirect(url_for('admin.dashboard', tab='fornecedores'))
+
+# ==============================================================================
+# GESTÃO DE PRESTADORES (TERCEIRIZADOS)
+# ==============================================================================
+
+@bp.route('/terceirizado/novo', methods=['POST'])
+@login_required
+def novo_terceirizado():
+    unidade_id = request.form.get('unidade_id')
+    # Se vazio, é None (Global)
+    if not unidade_id:
+        unidade_id = None
+        
+    novo_terc = Terceirizado(
+        nome=request.form.get('nome'),
+        nome_empresa=request.form.get('nome_empresa'),
+        cnpj=request.form.get('cnpj'),
+        telefone=request.form.get('telefone'),
+        email=request.form.get('email'),
+        especialidades=request.form.get('especialidades'), # Salva como String simples
+        unidade_id=unidade_id,
+        ativo=True
+    )
+    
+    db.session.add(novo_terc)
+    db.session.commit()
+    flash('Prestador de Serviço cadastrado com sucesso!', 'success')
+    return redirect(url_for('admin.dashboard', tab='terceirizados'))
+
+@bp.route('/terceirizado/excluir/<int:id>')
+@login_required
+def excluir_terceirizado(id):
+    prestador = Terceirizado.query.get_or_404(id)
+    # Exclusão lógica ou física? Como usuário pediu "Remover", vou deletar.
+    # Mas se tiver vínculos, pode dar erro de FK. Melhor desativar ou try/catch
+    try:
+        db.session.delete(prestador)
+        db.session.commit()
+        flash('Prestador removido.', 'success')
+    except:
+        db.session.rollback()
+        prestador.ativo = False
+        db.session.commit()
+        flash('Prestador desativado (possui histórico).', 'warning')
+        
+    return redirect(url_for('admin.dashboard', tab='terceirizados'))
 
 # ==============================================================================
 # APIs (JSON)

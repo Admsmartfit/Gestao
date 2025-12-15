@@ -79,26 +79,24 @@
 
     <div class="card shadow-sm mb-5">
         <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
-            <h5 class="mb-0"><i class="bi bi-tools"></i> Peças e Materiais</h5>
+            <h5 class="mb-0"><i class="bi bi-tools"></i> Peças e Serviços</h5>
             <div>
-                <button class="btn btn-warning btn-sm me-2" data-bs-toggle="modal"
-                    data-bs-target="#modalSolicitarCompra">
-                    <i class="bi bi-truck"></i> Solicitar Peça Externa
+                <!-- Botão Peças -->
+                <button class="btn btn-light btn-sm me-2" data-bs-toggle="modal" data-bs-target="#modalPeca">
+                    <i class="bi bi-box-seam"></i> Adicionar Peça
                 </button>
 
-                {% if os.status != 'concluida' %}
-                <div class="d-flex justify-content-end gap-2 mb-5">
-                    <button class="btn btn-outline-danger">Cancelar OS</button>
-
-                    <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#modalConcluir">
-                        <i class="bi bi-check2-all"></i> Concluir Serviço
-                    </button>
-                </div>
-                {% endif %}
+                <!-- Botão Serviços Externos -->
+                <button class="btn btn-warning btn-sm me-2" data-bs-toggle="modal"
+                    data-bs-target="#modalSolicitarCompra">
+                    <i class="bi bi-person-plus-fill"></i> Terceirizados
+                </button>
             </div>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
+            <!-- TABELA DE PEÇAS CONSUMIDAS -->
+            <h6 class="bg-light p-2 mb-0 border-bottom fw-bold text-muted">Peças do Estoque</h6>
+            <div class="table-responsive mb-3">
                 <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
@@ -109,6 +107,7 @@
                         </tr>
                     </thead>
                     <tbody>
+                        {% if os.movimentacoes %}
                         {% for mov in os.movimentacoes %}
                         {% if mov.tipo_movimentacao == 'consumo' %}
                         <tr>
@@ -118,12 +117,48 @@
                             <td>R$ {{ (mov.quantidade * mov.estoque.valor_unitario) | round(2) }}</td>
                         </tr>
                         {% endif %}
+                        {% endfor %}
                         {% else %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-3">Nenhuma peça utilizada até o momento.
+                            <td colspan="4" class="text-center text-muted py-3">Nenhuma peça utilizada.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- TABELA DE SERVIÇOS TERCEIRIZADOS (CHAMADOS EXTERNOS) -->
+            <h6 class="bg-light p-2 mb-0 border-bottom fw-bold text-muted border-top">Serviços Terceirizados</h6>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Prestador</th>
+                            <th>Serviço/Descrição</th>
+                            <th>Prazo</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if os.chamados_externos %}
+                        {% for ch in os.chamados_externos %}
+                        <tr>
+                            <td>{{ ch.terceirizado.nome }}</td>
+                            <td>{{ ch.descricao }}</td>
+                            <td>{{ ch.prazo_combinado.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if ch.status=='concluido' else 'warning' }}">
+                                    {{ ch.status|upper }}
+                                </span>
                             </td>
                         </tr>
                         {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">Nenhum serviço terceirizado vinculado.
+                            </td>
+                        </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
@@ -133,7 +168,7 @@
     {% if os.status != 'concluida' %}
     <div class="d-flex justify-content-end gap-2 mb-5">
         <button class="btn btn-outline-danger">Cancelar OS</button>
-        <button class="btn btn-primary btn-lg">
+        <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#modalConcluir">
             <i class="bi bi-check2-all"></i> Concluir Serviço
         </button>
     </div>
@@ -160,7 +195,11 @@
                     <small class="text-muted">Saldo disponível: <span id="saldoAtual">-</span></small>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer justify-content-between">
+                <button type="button" class="btn btn-outline-warning btn-sm" data-bs-dismiss="modal"
+                    data-bs-toggle="modal" data-bs-target="#modalSolicitarCompra">
+                    <i class="bi bi-cart-x"></i> Não tem no estoque? Solicitar Compra
+                </button>
                 <button type="button" class="btn btn-success" onclick="salvarPeca()">Adicionar</button>
             </div>
         </div>

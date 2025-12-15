@@ -28,6 +28,10 @@
             <button class="nav-link {% if active_tab == 'fornecedores' %}active{% endif %}" data-bs-toggle="tab"
                 data-bs-target="#fornecedores">Fornecedores</button>
         </li>
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'terceirizados' %}active{% endif %}" data-bs-toggle="tab"
+                data-bs-target="#terceirizados">Prestadores de Serviço</button>
+        </li>
     </ul>
 
     <div class="row mb-4">
@@ -374,6 +378,95 @@
                         {% else %}
                         <tr>
                             <td colspan="4" class="text-center text-muted">Nenhum registro encontrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ABA PRESTADORES DE SERVIÇO -->
+        <div class="tab-pane fade {% if active_tab == 'terceirizados' %}show active{% endif %}" id="terceirizados">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white fw-bold">Novo Prestador de Serviço</div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin.novo_terceirizado') }}" method="POST" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Nome Contato</label>
+                            <input type="text" name="nome" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Nome Empresa</label>
+                            <input type="text" name="nome_empresa" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Especialidades (Ex: Manutenção, Rede)</label>
+                            <input type="text" name="especialidades" class="form-control"
+                                placeholder="Separe por vírgula">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" name="telefone" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Abrangência (Unidade)</label>
+                            <select name="unidade_id" class="form-select">
+                                <option value="">Todas as Unidades (Global)</option>
+                                {% for u in unidades %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">Cadastrar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <h5 class="mt-4">Prestadores Cadastrados</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome / Empresa</th>
+                            <th>Contato</th>
+                            <th>Especialidades</th>
+                            <th>Abrangência</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in terceirizados %}
+                        <tr>
+                            <td>
+                                <strong>{{ t.nome }}</strong><br>
+                                <small class="text-muted">{{ t.nome_empresa or '' }}</small>
+                            </td>
+                            <td>
+                                {{ t.telefone }}<br>
+                                <small class="text-muted">{{ t.email or '' }}</small>
+                            </td>
+                            <td>{{ t.especialidades or '-' }}</td>
+                            <td>
+                                {% if t.unidade %}
+                                <span class="badge bg-secondary">{{ t.unidade.nome }}</span>
+                                {% else %}
+                                <span class="badge bg-success">Global (Todas)</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('admin.excluir_terceirizado', id=t.id) }}"
+                                    class="btn btn-sm btn-outline-danger" onclick="return confirm('Tem certeza?')"><i
+                                        class="bi bi-trash"></i></a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Nenhum prestador cadastrado.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

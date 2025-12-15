@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from app.extensions import db
 from app.models.models import Unidade, Usuario
-from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, Equipamento
+from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, Equipamento, AnexosOS
 from app.models.terceirizados_models import Terceirizado, ChamadoExterno
 from app.services.os_service import OSService
 from app.services.estoque_service import EstoqueService
@@ -64,7 +64,11 @@ def detalhes(id):
     
     # CORREÇÃO DO ERRO 1: Carregar todas as peças para o modal de solicitação
     todas_pecas = Estoque.query.order_by(Estoque.nome).all()
-    terceirizados = Terceirizado.query.filter_by(ativo=True).order_by(Terceirizado.nome).all()
+    
+    # Filtra terceirizados: Globais (None) OU da Unidade da OS
+    terceirizados = Terceirizado.query.filter(
+        (Terceirizado.unidade_id == None) | (Terceirizado.unidade_id == os_obj.unidade_id)
+    ).filter_by(ativo=True).order_by(Terceirizado.nome).all()
     
     return render_template('os_detalhes.html', 
                          os=os_obj, 
@@ -103,17 +107,72 @@ def concluir_os(id):
 def adicionar_peca(id):
     data = request.get_json()
     try:
-        novo_saldo = EstoqueService.consumir_item(
+        # Atualizado para receber o flag de alerta
+        novo_saldo, alerta_minimo = EstoqueService.consumir_item(
             os_id=id,
             estoque_id=data['estoque_id'],
             quantidade=data['quantidade'],
             usuario_id=current_user.id
         )
         os_obj = OrdemServico.query.get(id)
-        return jsonify({'success': True, 'novo_estoque': float(novo_saldo), 'custo_total_os': float(os_obj.custo_total)})
+        
+        msg = "Peça adicionada."
+        if alerta_minimo:
+            msg += " ATENÇÃO: Item atingiu estoque mínimo!"
+
+        return jsonify({
+            'success': True, 
+            'novo_estoque': float(novo_saldo), 
+            'custo_total_os': float(os_obj.custo_total),
+            'mensagem': msg,
+            'alerta': alerta_minimo
+        })
     except Exception as e:
         return jsonify({'success': False, 'erro': str(e)}), 400
 
+# [NOVA ROTA] Entrada de Estoque (Restock)
+@bp.route('/api/estoque/entrada', methods=['POST'])
+@login_required
+def entrada_estoque():
+    """Registra entrada de novas peças (compra/reposição)."""
+    # Apenas gerentes ou admins (ou técnicos, dependendo da regra, aqui deixei aberto a logados)
+    if current_user.tipo not in ['admin', 'gerente', 'tecnico']:
+         return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
+
+    data = request.get_json()
+    try:
+        novo_saldo = EstoqueService.repor_estoque(
+            estoque_id=data['estoque_id'],
+            quantidade=data['quantidade'],
+            usuario_id=current_user.id,
+            motivo=data.get('motivo')
+        )
+        return jsonify({'success': True, 'novo_saldo': float(novo_saldo)})
+    except Exception as e:
+        return jsonify({'success': False, 'erro': str(e)}), 400
+
+# [NOVA ROTA] Upload de Anexos em OS Aberta
+@bp.route('/<int:id>/anexos', methods=['POST'])
+@login_required
+def upload_anexos(id):
+    os_obj = OrdemServico.query.get_or_404(id)
+    if os_obj.status in ['concluida', 'cancelada']:
+        flash('Não é possível anexar arquivos a uma OS fechada.', 'warning')
+        return redirect(url_for('os.detalhes', id=id))
+
+    fotos = request.files.getlist('fotos')
+    if fotos:
+        try:
+            OSService.processar_fotos(fotos, os_obj.id, tipo='documento') # ou 'foto_extra'
+            db.session.commit()
+            flash('Arquivos anexados com sucesso!', 'success')
+        except ValueError as e:
+            flash(str(e), 'danger')
+        except Exception as e:
+            flash(f'Erro no upload: {str(e)}', 'danger')
+            
+    return redirect(url_for('os.detalhes', id=id))
+    
 @bp.route('/api/pecas/buscar')
 @login_required
 def buscar_pecas():
