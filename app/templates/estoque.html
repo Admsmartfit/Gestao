@@ -1,60 +1,66 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-box-seam"></i> Controle de Estoque</h2>
-        {% if current_user.tipo in ['admin', 'gerente'] %}
-        <a href="{{ url_for('admin.dashboard', tab='fornecedores') }}" class="btn btn-outline-primary">
-            <i class="bi bi-plus-lg"></i> Gerenciar Itens
-        </a>
-        {% endif %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Controle de Estoque</h2>
+        <p class="text-muted mb-0">Gerenciamento de peças e insumos.</p>
     </div>
+    {% if current_user.tipo in ['admin', 'gerente'] %}
+    <a href="{{ url_for('admin.dashboard', tab='fornecedores') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-2"></i> Novo Item
+    </a>
+    {% endif %}
+</div>
 
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Código</th>
-                            <th>Nome da Peça</th>
-                            <th>Categoria</th>
-                            <th>Saldo Atual</th>
-                            <th>Mínimo</th>
-                            <th>Valor Unit.</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in estoque %}
-                        <tr class="{% if item.quantidade_atual <= item.quantidade_minima %}table-danger{% endif %}">
-                            <td class="fw-bold">{{ item.codigo }}</td>
-                            <td>{{ item.nome }}</td>
-                            <td>{{ item.categoria.nome if item.categoria else '-' }}</td>
-                            <td>
-                                {{ item.quantidade_atual | round(2) }} {{ item.unidade_medida }}
-                            </td>
-                            <td>{{ item.quantidade_minima | round(2) }}</td>
-                            <td>R$ {{ item.valor_unitario }}</td>
-                            <td>
-                                {% if item.quantidade_atual <= item.quantidade_minima %} <span class="badge bg-danger">
-                                    <i class="bi bi-exclamation-triangle-fill"></i> CRÍTICO
-                                    </span>
-                                    {% else %}
-                                    <span class="badge bg-success">NORMAL</span>
-                                    {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="7" class="text-center text-muted py-4">Nenhum item cadastrado no estoque.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div class="card border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th class="ps-4">Item</th>
+                    <th>Categoria</th>
+                    <th>Saldo</th>
+                    <th>Valor Unit.</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in estoque %}
+                <tr>
+                    <td class="ps-4">
+                        <div class="fw-bold text-dark">{{ item.nome }}</div>
+                        <small class="text-muted font-monospace">{{ item.codigo }}</small>
+                    </td>
+                    <td>
+                        <span
+                            class="badge bg-secondary text-dark bg-opacity-10 border border-secondary border-opacity-10">
+                            {{ item.categoria.nome if item.categoria else 'Geral' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="fw-bold">{{ item.quantidade_atual | round(2) }}</span>
+                        <small class="text-muted">{{ item.unidade_medida }}</small>
+                    </td>
+                    <td>R$ {{ item.valor_unitario }}</td>
+                    <td>
+                        {% if item.quantidade_atual <= item.quantidade_minima %} <span class="badge bg-danger">
+                            <i class="bi bi-arrow-down"></i> Baixo
+                            </span>
+                            {% else %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check"></i> Normal
+                            </span>
+                            {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">Estoque vazio.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}

@@ -12,6 +12,13 @@
                 {% else %}
                 <span class="badge bg-secondary">{{ os.status }}</span>
                 {% endif %}
+
+                {% if os.status != 'concluida' %}
+                <button class="btn btn-sm btn-outline-primary ms-2" data-bs-toggle="modal"
+                    data-bs-target="#modalEditarOS">
+                    <i class="bi bi-pencil"></i> Editar
+                </button>
+                {% endif %}
             </h2>
             <p class="text-muted mb-0">
                 <i class="bi bi-geo-alt"></i> {{ os.unidade.nome }} |
@@ -156,6 +163,133 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-success" onclick="salvarPeca()">Adicionar</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL SOLICITAÇÕES EXTERNAS (Novo) -->
+<div class="modal fade" id="modalSolicitarCompra" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cart-plus-fill"></i> Solicitações Externas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="externalTab" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="servico-tab" data-bs-toggle="tab"
+                            data-bs-target="#servico-pane" type="button">
+                            <i class="bi bi-person-gear"></i> Novo Serviço Terceirizado
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="peca-tab" data-bs-toggle="tab" data-bs-target="#peca-pane"
+                            type="button">
+                            <i class="bi bi-box-seam"></i> Compra de Peça
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="externalTabContent">
+                    <!-- ABA SERVIÇO -->
+                    <div class="tab-pane fade show active" id="servico-pane" role="tabpanel">
+                        <form action="{{ url_for('os.adicionar_tarefa_externa', id=os.id) }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Prestador / Terceirizado</label>
+                                <select name="terceirizado_id" class="form-select" required>
+                                    <option value="" disabled selected>Selecione...</option>
+                                    {% for t in terceirizados %}
+                                    <option value="{{ t.id }}">{{ t.nome }} ({{ t.especialidades }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Descrição do Serviço</label>
+                                <textarea name="descricao" class="form-control" rows="3" required
+                                    placeholder="Ex: Reparo na placa lógica..."></textarea>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Prazo Estimado</label>
+                                    <input type="datetime-local" name="prazo" class="form-control" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Valor Orçado (R$)</label>
+                                    <input type="number" step="0.01" name="valor" class="form-control"
+                                        placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-plus-lg"></i> Criar Tarefa
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- ABA PEÇA -->
+                    <div class="tab-pane fade" id="peca-pane" role="tabpanel">
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle"></i> Solicite a compra de peças que não temos em estoque.
+                        </div>
+                        <form>
+                            <div class="mb-3">
+                                <label class="form-label">Nome da Peça</label>
+                                <input type="text" class="form-control" placeholder="Ex: Correia dentada XP-200">
+                            </div>
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-warning w-100"
+                                    onclick="alert('Funcionalidade de Cotação em desenvolvimento.')">
+                                    Buscar Fornecedores
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDITAR OS -->
+<div class="modal fade" id="modalEditarOS" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Ordem de Serviço</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('os.editar_os', id=os.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Prazo de Conclusão</label>
+                        <input type="datetime-local" name="prazo_conclusao" class="form-control"
+                            value="{{ os.prazo_conclusao.strftime('%Y-%m-%dT%H:%M') if os.prazo_conclusao else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Prioridade</label>
+                        <select name="prioridade" class="form-select">
+                            <option value="baixa" {% if os.prioridade=='baixa' %}selected{% endif %}>Baixa</option>
+                            <option value="media" {% if os.prioridade=='media' %}selected{% endif %}>Média</option>
+                            <option value="alta" {% if os.prioridade=='alta' %}selected{% endif %}>Alta</option>
+                            <option value="urgente" {% if os.prioridade=='urgente' %}selected{% endif %}>Urgente
+                            </option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição do Problema (Adicionar Notas)</label>
+                        <textarea name="descricao_problema" class="form-control"
+                            rows="5">{{ os.descricao_problema }}</textarea>
+                        <small class="text-muted">Você pode editar ou adicionar novas informações ao texto
+                            existente.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

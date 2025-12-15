@@ -4,6 +4,7 @@ from datetime import datetime
 from app.extensions import db
 from app.models.models import Unidade, Usuario
 from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, Equipamento
+from app.models.terceirizados_models import Terceirizado, ChamadoExterno
 from app.services.os_service import OSService
 from app.services.estoque_service import EstoqueService
 
@@ -39,6 +40,8 @@ def nova_os():
                 nova_os.fotos_antes = caminhos
                 db.session.commit()
 
+            db.session.commit()
+
             flash(f'OS {nova_os.numero_os} criada com sucesso!', 'success')
             return redirect(url_for('os.detalhes', id=nova_os.id))
             
@@ -61,11 +64,13 @@ def detalhes(id):
     
     # CORREÇÃO DO ERRO 1: Carregar todas as peças para o modal de solicitação
     todas_pecas = Estoque.query.order_by(Estoque.nome).all()
+    terceirizados = Terceirizado.query.filter_by(ativo=True).order_by(Terceirizado.nome).all()
     
     return render_template('os_detalhes.html', 
                          os=os_obj, 
                          categorias=categorias,
-                         todas_pecas=todas_pecas) # Passando a variável aqui
+                         todas_pecas=todas_pecas,
+                         terceirizados=terceirizados) # Passando a variável aqui
 
 # CORREÇÃO DO ERRO 2: Nova rota para concluir a OS
 @bp.route('/<int:id>/concluir', methods=['POST'])
@@ -147,3 +152,84 @@ def filtrar_equipamentos():
         'id': e.id,
         'nome': e.nome
     } for e in equipamentos])
+
+@bp.route('/<int:id>/adicionar-tarefa-externa', methods=['POST'])
+@login_required
+def adicionar_tarefa_externa(id):
+    os_obj = OrdemServico.query.get_or_404(id)
+    
+    terceirizado_id = request.form.get('terceirizado_id')
+    descricao = request.form.get('descricao')
+    prazo_str = request.form.get('prazo')
+    valor_str = request.form.get('valor')
+    
+    if not terceirizado_id or not descricao:
+        flash('Preencha os campos obrigatórios.', 'danger')
+        return redirect(url_for('os.detalhes', id=id))
+
+    try:
+        prazo_dt = datetime.strptime(prazo_str, '%Y-%m-%dT%H:%M')
+        
+        # Gera sufixo baseado na quantidade atual de chamados
+        count = len(os_obj.chamados_externos) + 1
+        num_chamado = f"EXT-{os_obj.numero_os}-{count}"
+
+        novo_chamado = ChamadoExterno(
+            numero_chamado=num_chamado,
+            os_id=os_obj.id,
+            terceirizado_id=int(terceirizado_id),
+            titulo=f"Serviço Adicional OS {os_obj.numero_os}",
+            descricao=descricao,
+            prioridade=os_obj.prioridade,
+            prazo_combinado=prazo_dt,
+            criado_por=current_user.id,
+            valor_orcado=valor_str if valor_str else None,
+            status='aguardando'
+        )
+        
+        db.session.add(novo_chamado)
+        db.session.commit()
+        
+        flash('Tarefa externa criada com sucesso!', 'success')
+        
+    except ValueError:
+        flash('Formato de data inválido.', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao criar tarefa: {str(e)}', 'danger')
+
+    return redirect(url_for('os.detalhes', id=id))
+
+@bp.route('/<int:id>/editar', methods=['POST'])
+@login_required
+def editar_os(id):
+    os_obj = OrdemServico.query.get_or_404(id)
+    
+    if os_obj.status == 'concluida':
+        flash('Não é possível editar uma OS concluída.', 'warning')
+        return redirect(url_for('os.detalhes', id=id))
+        
+    try:
+        prazo_str = request.form.get('prazo_conclusao')
+        prioridade = request.form.get('prioridade')
+        descricao = request.form.get('descricao_problema')
+        
+        if prazo_str:
+            os_obj.prazo_conclusao = datetime.strptime(prazo_str, '%Y-%m-%dT%H:%M')
+            
+        if prioridade:
+            os_obj.prioridade = prioridade
+            
+        if descricao:
+            os_obj.descricao_problema = descricao
+            
+        db.session.commit()
+        flash('Ordem de Serviço atualizada.', 'success')
+        
+    except ValueError:
+        flash('Formato de data inválido.', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar OS: {str(e)}', 'danger')
+        
+    return redirect(url_for('os.detalhes', id=id))

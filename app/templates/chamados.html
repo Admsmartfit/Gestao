@@ -1,123 +1,124 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Gestão de Terceirizados</h2>
+<div class="row mb-4 align-items-end">
+    <div class="col">
+        <h2 class="fw-bold mb-1">Tarefas Externas</h2>
+        <p class="text-muted mb-0">Gestão de serviços terceirizados e chamados.</p>
+    </div>
+    <div class="col-auto">
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoChamado">
-            <i class="bi bi-plus-lg"></i> Novo Chamado
+            <i class="bi bi-plus-lg me-2"></i> Criar Tarefa
         </button>
     </div>
+</div>
 
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="text-center">Status</th>
-                            <th>Chamado</th>
-                            <th>Prestador</th>
-                            <th>Prazo Limite</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for c in chamados %}
-                        <tr>
-                            <td class="text-center">
-                                {% if c.status == 'concluido' %}
-                                <span class="badge bg-success">Concluído</span>
-                                {% elif not c.prazo_combinado %}
-                                <span class="badge bg-secondary">S/ Prazo</span>
+<div class="card border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Tarefa / Chamado</th>
+                        <th>Prestador</th>
+                        <th>Prazo</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in chamados %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="fw-bold">{{ c.titulo }}</div>
+                            <small class="text-muted font-monospace">{{ c.numero_chamado }}</small>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle bg-light text-primary me-2 rounded-circle d-flex align-items-center justify-content-center"
+                                    style="width: 32px; height: 32px;">
+                                    <i class="bi bi-person-fill"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-500">{{ c.terceirizado.nome }}</div>
+                                    <small class="text-muted" style="font-size: 0.75rem;">{{ c.terceirizado.telefone
+                                        }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if c.prazo_combinado %}
+                            {% if c.prazo_combinado < hoje and c.status !='concluido' %} <span
+                                class="text-danger fw-bold"><i class="bi bi-exclamation-circle"></i> {{
+                                c.prazo_combinado.strftime('%d/%m') }}</span>
                                 {% else %}
-                                {% set dias_restantes = (c.prazo_combinado - hoje).days %}
-
-                                {% if c.prazo_combinado < hoje %} <span class="badge bg-danger">Atrasado</span>
-                                    {% elif dias_restantes < 1 %} <span class="badge bg-warning text-dark">Vence
-                                        Hoje</span>
-                                        {% else %}
-                                        <span class="badge bg-info text-dark">No Prazo</span>
-                                        {% endif %}
-                                        {% endif %}
-                            </td>
-                            <td>
-                                <strong>{{ c.numero_chamado }}</strong><br>
-                                <span class="text-muted small">{{ c.titulo }}</span>
-                            </td>
-                            <td>
-                                {{ c.terceirizado.nome }}<br>
-                                <small class="text-muted">{{ c.terceirizado.telefone }}</small>
-                            </td>
-                            <td>
-                                {% if c.prazo_combinado %}
-                                {{ c.prazo_combinado.strftime('%d/%m/%Y %H:%M') }}
+                                {{ c.prazo_combinado.strftime('%d/%m %H:%M') }}
+                                {% endif %}
                                 {% else %}
                                 -
                                 {% endif %}
-                            </td>
-                            <td>
-                                {% if c.prazo_combinado and c.prazo_combinado < hoje and c.status !='concluido' %}
-                                    <button onclick="cobrar('{{ c.id }}')" class="btn btn-sm btn-outline-danger"
-                                    title="Enviar WhatsApp">
-                                    <i class="bi bi-whatsapp"></i> Cobrar
-                                    </button>
-                                    {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center py-4 text-muted">
-                                Nenhum chamado cadastrado.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                        </td>
+                        <td>
+                            {% if c.status == 'concluido' %}
+                            <span class="badge bg-success">Concluído</span>
+                            {% elif c.prazo_combinado < hoje %} <span class="badge bg-danger">Atrasado</span>
+                                {% else %}
+                                <span class="badge bg-info">Em Andamento</span>
+                                {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            {% if c.prazo_combinado and c.prazo_combinado < hoje and c.status !='concluido' %} <button
+                                onclick="cobrar('{{ c.id }}')" class="btn btn-sm btn-outline-danger"
+                                title="Cobrar via WhatsApp">
+                                <i class="bi bi-whatsapp"></i>
+                                </button>
+                                {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">Nenhuma tarefa externa registrada.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="modalNovoChamado" tabindex="-1">
-    <div class="modal-dialog">
-        <form class="modal-content" action="{{ url_for('terceirizados.criar_chamado') }}" method="POST">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Abrir Chamado Externo</h5>
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-0 shadow" action="{{ url_for('terceirizados.criar_chamado') }}" method="POST">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Nova Tarefa Externa</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Selecione o Prestador</label>
+                    <label class="form-label text-muted small fw-bold text-uppercase">Prestador</label>
                     <select name="terceirizado_id" class="form-select" required>
-                        <option value="" disabled selected>Escolha...</option>
-                        {% if terceirizados %}
+                        <option value="" disabled selected>Selecione...</option>
                         {% for t in terceirizados %}
-                        <option value="{{ t.id }}">{{ t.nome }} - {{ t.especialidades }}</option>
+                        <option value="{{ t.id }}">{{ t.nome }}</option>
                         {% endfor %}
-                        {% else %}
-                        <option value="" disabled>Nenhum prestador cadastrado (Cadastre no Admin)</option>
-                        {% endif %}
                     </select>
                 </div>
-
                 <div class="mb-3">
-                    <label class="form-label">Título do Serviço</label>
-                    <input type="text" name="titulo" class="form-control" required>
+                    <label class="form-label text-muted small fw-bold text-uppercase">Título</label>
+                    <input type="text" name="titulo" class="form-control" placeholder="Ex: Manutenção Ar Condicionado"
+                        required>
                 </div>
-
                 <div class="mb-3">
-                    <label class="form-label">Descrição</label>
+                    <label class="form-label text-muted small fw-bold text-uppercase">Descrição</label>
                     <textarea name="descricao" class="form-control" rows="3"></textarea>
                 </div>
-
                 <div class="row">
-                    <div class="col-md-6">
-                        <label class="form-label">Prazo</label>
+                    <div class="col-6">
+                        <label class="form-label text-muted small fw-bold text-uppercase">Prazo</label>
                         <input type="datetime-local" name="prazo" class="form-control" required>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Prioridade</label>
+                    <div class="col-6">
+                        <label class="form-label text-muted small fw-bold text-uppercase">Prioridade</label>
                         <select name="prioridade" class="form-select">
                             <option value="media">Média</option>
                             <option value="alta">Alta</option>
@@ -126,9 +127,9 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-success">Salvar</button>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary px-4">Criar Tarefa</button>
             </div>
         </form>
     </div>
@@ -136,11 +137,11 @@
 
 <script>
     function cobrar(id) {
-        if (confirm("Enviar cobrança via WhatsApp?")) {
+        if (confirm("Enviar cobrança automática via WhatsApp?")) {
             fetch(`/terceirizados/chamados/${id}/cobrar`, { method: 'POST' })
                 .then(res => res.json())
                 .then(data => alert(data.msg))
-                .catch(err => alert("Erro ao enviar cobrança."));
+                .catch(err => alert("Erro ao conectar com API."));
         }
     }
 </script>
