@@ -46,7 +46,7 @@ class Usuario(UserMixin, db.Model):
 
 
 class RegistroPonto(db.Model):
-    __tablename__ = 'registros_ponto' # [cite: 71]
+    __tablename__ = 'registros_ponto' #
     
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
@@ -57,7 +57,7 @@ class RegistroPonto(db.Model):
     ip_origem_saida = db.Column(db.String(45), nullable=True)
     observacoes = db.Column(db.Text, nullable=True)
 
-    # Índices conforme especificado [cite: 73-75]
+    # Índices conforme especificado
     __table_args__ = (
         db.Index('idx_usuario_data', 'usuario_id', 'data_hora_entrada'),
         db.Index('idx_unidade_data', 'unidade_id', 'data_hora_entrada'),

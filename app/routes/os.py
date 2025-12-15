@@ -14,7 +14,6 @@ bp = Blueprint('os', __name__, url_prefix='/os')
 def nova_os():
     if request.method == 'POST':
         try:
-            # Tratamento da Data do Prazo
             prazo_str = request.form.get('prazo_conclusao')
             prazo_dt = datetime.strptime(prazo_str, '%Y-%m-%dT%H:%M') if prazo_str else None
             
@@ -22,8 +21,8 @@ def nova_os():
                 numero_os=OSService.gerar_numero_os(),
                 tecnico_id=request.form.get('tecnico_id'),
                 unidade_id=request.form.get('unidade_id'),
-                equipamento_id=request.form.get('equipamento_id'), # Usa ID do equipamento
-                prazo_conclusao=prazo_dt, # Usa objeto datetime
+                equipamento_id=request.form.get('equipamento_id'),
+                prazo_conclusao=prazo_dt,
                 tipo_manutencao=request.form.get('tipo_manutencao'),
                 prioridade=request.form.get('prioridade'),
                 descricao_problema=request.form.get('descricao_problema'),
@@ -31,11 +30,12 @@ def nova_os():
             )
             
             db.session.add(nova_os)
-            db.session.commit()
+            db.session.commit() # Commit para gerar o ID da OS
             
+            # Processar Fotos (Agora salva na tabela anexos_os e retorna lista pro JSON)
             fotos = request.files.getlist('fotos_antes')
             if fotos and fotos[0].filename != '':
-                caminhos = OSService.processar_fotos(fotos, nova_os.id)
+                caminhos = OSService.processar_fotos(fotos, nova_os.id, tipo='foto_antes')
                 nova_os.fotos_antes = caminhos
                 db.session.commit()
 
@@ -51,12 +51,8 @@ def nova_os():
 
     unidades = Unidade.query.filter_by(ativa=True).all()
     tecnicos = Usuario.query.filter(Usuario.tipo.in_(['tecnico', 'admin'])).all()
+    return render_template('os_nova.html', unidades=unidades, tecnicos=tecnicos)
     
-    # Não precisamos carregar todos os equipamentos aqui, pois o AJAX fará isso
-    return render_template('os_nova.html', 
-                         unidades=unidades, 
-                         tecnicos=tecnicos)
-
 @bp.route('/<int:id>', methods=['GET'])
 @login_required
 def detalhes(id):
@@ -81,13 +77,12 @@ def concluir_os(id):
         flash('Esta OS já está concluída.', 'warning')
         return redirect(url_for('os.detalhes', id=id))
 
-    # Captura dados do formulário de conclusão
     solucao = request.form.get('descricao_solucao')
     
-    # Processar fotos do "Depois" (opcional)
+    # Processar fotos do "Depois"
     fotos = request.files.getlist('fotos_depois')
     if fotos and fotos[0].filename != '':
-        caminhos = OSService.processar_fotos(fotos, os_obj.id)
+        caminhos = OSService.processar_fotos(fotos, os_obj.id, tipo='foto_depois')
         os_obj.fotos_depois = caminhos
 
     os_obj.descricao_solucao = solucao
@@ -97,7 +92,7 @@ def concluir_os(id):
     db.session.commit()
     flash('Ordem de Serviço concluída com sucesso!', 'success')
     return redirect(url_for('os.detalhes', id=id))
-    
+
 @bp.route('/<int:id>/adicionar-peca', methods=['POST'])
 @login_required
 def adicionar_peca(id):
@@ -121,6 +116,12 @@ def buscar_pecas():
     if len(termo) < 2: return jsonify([])
     pecas = Estoque.query.filter(Estoque.nome.ilike(f'%{termo}%')).limit(10).all()
     return jsonify([{'id': p.id, 'nome': p.nome, 'unidade': p.unidade_medida, 'saldo': float(p.quantidade_atual)} for p in pecas])
+
+@bp.route('/estoque/painel')
+@login_required
+def painel_estoque():
+    itens = Estoque.query.order_by(Estoque.nome).all()
+    return render_template('estoque.html', estoque=itens)
 
 # --- ROTA QUE ESTAVA FALTANDO ---
 @bp.route('/api/equipamentos/filtro')

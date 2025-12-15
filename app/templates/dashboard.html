@@ -7,38 +7,48 @@
         <div class="col-md-3 mb-4">
 
             {% if current_user.tipo == 'tecnico' %}
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-header bg-dark text-white py-2">
-                    <small><i class="bi bi-clock"></i> Meu Ponto</small>
-                </div>
-                <div class="card-body text-center p-3">
+            <section class="card-widget mb-4" aria-labelledby="ponto-heading">
+                <header class="card-widget__header">
+                    <h2 id="ponto-heading" class="card-widget__title">
+                        <i class="bi bi-clock" aria-hidden="true"></i> Meu Ponto
+                    </h2>
+                </header>
+                <div class="card-body text-center p-4">
                     {% if registro_aberto %}
-                    <div class="badge bg-success mb-2 w-100">TRABALHANDO</div>
-                    <p class="small text-muted mb-2">Entrada: {{ registro_aberto.data_hora_entrada.strftime('%H:%M') }}
+                    <div class="status-badge status-badge--success mb-3 w-100">
+                        <i class="bi bi-check-circle-fill me-1"></i> Trabalhando
+                    </div>
+                    <p class="small text-muted mb-3">
+                        Entrada registrada às <strong>{{ registro_aberto.data_hora_entrada.strftime('%H:%M') }}</strong>
                     </p>
 
                     <form action="{{ url_for('ponto.checkout') }}" method="POST">
                         <input type="hidden" name="registro_id" value="{{ registro_aberto.id }}">
-                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                        <button type="submit" class="btn btn-outline-danger w-100 btn-modern">
                             Encerrar Expediente
                         </button>
                     </form>
                     {% else %}
-                    <div class="badge bg-secondary mb-2 w-100">AUSENTE</div>
+                    <div class="status-badge status-badge--warning mb-3 w-100">
+                        <i class="bi bi-pause-circle-fill me-1"></i> Ausente
+                    </div>
                     <form action="{{ url_for('ponto.checkin') }}" method="POST">
-                        <select name="unidade_id" class="form-select form-select-sm mb-2" required>
-                            <option value="" selected disabled>Unidade...</option>
-                            {% for u in unidades %}
-                            <option value="{{ u.id }}">{{ u.nome }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <div class="mb-3">
+                            <label for="unidade_select" class="visually-hidden">Selecione a Unidade</label>
+                            <select id="unidade_select" name="unidade_id" class="form-select" required>
+                                <option value="" selected disabled>Selecione a Unidade...</option>
+                                {% for u in unidades %}
+                                <option value="{{ u.id }}">{{ u.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 btn-modern">
                             Iniciar Expediente
                         </button>
                     </form>
                     {% endif %}
                 </div>
-            </div>
+            </section>
             {% endif %}
 
             <div class="d-grid gap-2">
