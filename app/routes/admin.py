@@ -327,3 +327,22 @@ def buscar_fornecedores_peca(peca_id):
     resultado.sort(key=lambda x: x['prazo_medio_geral'])
     
     return jsonify(resultado)
+
+@bp.route('/api/fornecedores/<int:id>/pecas')
+@login_required
+def buscar_pecas_fornecedor(id):
+    """
+    Retorna lista de peças que um fornecedor específico fornece.
+    """
+    itens = CatalogoFornecedor.query.filter_by(fornecedor_id=id).all()
+    resultado = []
+    
+    for item in itens:
+        resultado.append({
+            'codigo': item.estoque.codigo,
+            'nome': item.estoque.nome,
+            'preco': float(item.preco_atual) if item.preco_atual else 0.0,
+            'prazo': item.prazo_estimado_dias
+        })
+        
+    return jsonify(resultado)

@@ -25,8 +25,12 @@
                 data-bs-target="#unidades">Unidades</button>
         </li>
         <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'catalogo' %}active{% endif %}" data-bs-toggle="tab"
+                data-bs-target="#catalogo">Catálogo de Peças</button>
+        </li>
+        <li class="nav-item">
             <button class="nav-link {% if active_tab == 'fornecedores' %}active{% endif %}" data-bs-toggle="tab"
-                data-bs-target="#fornecedores">Fornecedores</button>
+                data-bs-target="#fornecedores">Gestão Fornecedores</button>
         </li>
         <li class="nav-item">
             <button class="nav-link {% if active_tab == 'terceirizados' %}active{% endif %}" data-bs-toggle="tab"
@@ -233,151 +237,108 @@
             </table>
         </div>
 
-        <div class="tab-pane fade {% if active_tab == 'fornecedores' %}show active{% endif %}" id="fornecedores">
-            <div class="row">
-
-                <div class="col-md-5">
-                    <div class="card mb-4 shadow-sm border-dark">
-                        <div class="card-header bg-dark text-white">
-                            <i class="bi bi-shop"></i> 1. Cadastrar Fornecedor
-                        </div>
-                        <div class="card-body">
-                            <form action="{{ url_for('admin.novo_fornecedor') }}" method="POST">
-                                <div class="mb-3">
-                                    <label class="form-label">Nome / Razão Social</label>
-                                    <input type="text" name="nome" class="form-control" required>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col">
-                                        <label class="form-label">Email</label>
-                                        <input type="email" name="email" class="form-control">
-                                    </div>
-                                    <div class="col">
-                                        <label class="form-label">Telefone</label>
-                                        <input type="text" name="telefone" class="form-control">
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Prazo Médio Inicial (Dias)</label>
-                                    <input type="number" name="prazo_inicial" class="form-control" value="7">
-                                </div>
-                                <button type="submit" class="btn btn-dark w-100">Salvar Fornecedor</button>
-                            </form>
-                        </div>
-                    </div>
+        <!-- ABA CATÁLOGO (NOVA) -->
+        <div class="tab-pane fade {% if active_tab == 'catalogo' %}show active{% endif %}" id="catalogo">
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success text-white fw-bold">
+                    <i class="bi bi-box-seam"></i> Nova Peça no Estoque
                 </div>
-
-                <div class="col-md-7">
-
-                    <div class="card mb-4 shadow-sm border-success">
-                        <div class="card-header bg-success text-white">
-                            <i class="bi bi-box-seam"></i> 2. Cadastrar Nova Peça (Estoque)
+                <div class="card-body">
+                    <form action="{{ url_for('admin.novo_item_estoque') }}" method="POST"
+                        class="row g-3 align-items-end">
+                        <div class="col-md-2">
+                            <label class="form-label">Código</label>
+                            <input type="text" name="codigo" class="form-control" placeholder="ABC-123" required>
                         </div>
-                        <div class="card-body">
-                            <p class="small text-muted mb-2">Use isto se a peça ainda não existe no sistema.</p>
-                            <form action="{{ url_for('admin.novo_item_estoque') }}" method="POST"
-                                class="row g-2 align-items-end">
-                                <div class="col-md-3">
-                                    <label class="small fw-bold">Código</label>
-                                    <input type="text" name="codigo" class="form-control form-control-sm"
-                                        placeholder="Ex: ROL-99" required>
-                                </div>
-                                <div class="col-md-5">
-                                    <label class="small fw-bold">Nome da Peça</label>
-                                    <input type="text" name="nome" class="form-control form-control-sm"
-                                        placeholder="Ex: Rolamento XYZ" required>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="small fw-bold">Unidade</label>
-                                    <select name="unidade_medida" class="form-select form-select-sm">
-                                        <option value="UN">UN</option>
-                                        <option value="MT">MT</option>
-                                        <option value="KG">KG</option>
-                                        <option value="L">L</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <button type="submit" class="btn btn-success btn-sm w-100">Salvar</button>
-                                </div>
-                            </form>
+                        <div class="col-md-5">
+                            <label class="form-label">Nome da Peça</label>
+                            <input type="text" name="nome" class="form-control" required>
                         </div>
-                    </div>
-
-                    <div class="card mb-4 shadow-sm border-secondary">
-                        <div class="card-header bg-secondary text-white">
-                            <i class="bi bi-link-45deg"></i> 3. Vincular Peça ao Fornecedor
+                        <div class="col-md-2">
+                            <label class="form-label">Unidade</label>
+                            <select name="unidade_medida" class="form-select">
+                                <option value="UN">UN</option>
+                                <option value="M">M</option>
+                                <option value="KG">KG</option>
+                                <option value="L">L</option>
+                            </select>
                         </div>
-                        <div class="card-body">
-                            <p class="small text-muted mb-2">Define quem fornece o quê, e o preço/prazo acordado.</p>
-                            <form action="{{ url_for('admin.vincular_peca_fornecedor') }}" method="POST">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Fornecedor</label>
-                                        <select name="fornecedor_id" class="form-select" required>
-                                            <option value="" selected disabled>Selecione...</option>
-                                            {% for f in fornecedores %}
-                                            <option value="{{ f.id }}">{{ f.nome }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Peça (Estoque)</label>
-                                        <select name="estoque_id" class="form-select" required>
-                                            <option value="" selected disabled>Selecione...</option>
-                                            {% for item in estoque_itens %}
-                                            <option value="{{ item.id }}">{{ item.nome }} ({{ item.codigo }})</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col">
-                                        <input type="number" name="preco" step="0.01" class="form-control"
-                                            placeholder="Preço (R$)">
-                                    </div>
-                                    <div class="col">
-                                        <input type="number" name="prazo" class="form-control"
-                                            placeholder="Prazo (Dias)">
-                                    </div>
-                                    <div class="col">
-                                        <button type="submit" class="btn btn-secondary w-100">Vincular</button>
-                                    </div>
-                                </div>
-                            </form>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-success w-100">Adicionar ao Catálogo</button>
                         </div>
-                    </div>
-
+                    </form>
                 </div>
             </div>
 
-            <h5 class="mt-4 border-bottom pb-2">Catálogo de Fornecedores Cadastrados</h5>
+            <h5>Inventário Cadastrado</h5>
             <div class="table-responsive">
-                <table class="table table-hover table-sm">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>Unidade</th>
+                            <th>Saldo Atual</th>
+                            <th>Estoque Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in estoque_itens %}
+                        <tr>
+                            <td class="fw-bold">{{ item.codigo }}</td>
+                            <td>{{ item.nome }}</td>
+                            <td>{{ item.unidade_medida }}</td>
+                            <td>{{ item.quantidade_atual }}</td>
+                            <td>{{ item.quantidade_minima }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Nenhum item cadastrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ABA FORNECEDORES (REFATORADA) -->
+        <div class="tab-pane fade {% if active_tab == 'fornecedores' %}show active{% endif %}" id="fornecedores">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>Base de Fornecedores</h5>
+                <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalNovoFornecedor">
+                    <i class="bi bi-plus-lg"></i> Novo Fornecedor
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
                     <thead class="table-light">
                         <tr>
                             <th>Fornecedor</th>
                             <th>Contato</th>
-                            <th>Prazo Médio Real</th>
-                            <th>Performance</th>
+                            <th>Prazo Médio</th>
+                            <th>Entregas</th>
+                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for f in fornecedores %}
                         <tr>
                             <td class="fw-bold">{{ f.nome }}</td>
-                            <td>{{ f.email }} | {{ f.telefone }}</td>
+                            <td>{{ f.email }}<br><small>{{ f.telefone }}</small></td>
+                            <td><span class="badge bg-secondary">{{ "{:.0f}".format(f.prazo_medio_entrega_dias) }}
+                                    dias</span></td>
+                            <td>{{ f.total_pedidos_entregues }}</td>
                             <td>
-                                <span class="badge bg-info text-dark">
-                                    {{ "{:.1f}".format(f.prazo_medio_entrega_dias) }} dias
-                                </span>
-                            </td>
-                            <td>
-                                <small class="text-muted">{{ f.total_pedidos_entregues }} entregas registradas</small>
+                                <button class="btn btn-sm btn-outline-primary"
+                                    onclick="abrirCatalogo({{ f.id }}, '{{ f.nome }}')">
+                                    <i class="bi bi-list-check"></i> Gerenciar Catálogo
+                                </button>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted">Nenhum registro encontrado.</td>
+                            <td colspan="5" class="text-center text-muted">Nenhum fornecedor cadastrado.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -473,6 +434,154 @@
                 </table>
             </div>
         </div>
+
+        <!-- MODAL NOVO FORNECEDOR -->
+        <div class="modal fade" id="modalNovoFornecedor" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title">Novo Fornecedor</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form action="{{ url_for('admin.novo_fornecedor') }}" method="POST">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Nome / Razão Social</label>
+                                <input type="text" name="nome" class="form-control" required>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" name="email" class="form-control">
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Telefone</label>
+                                    <input type="text" name="telefone" class="form-control">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Prazo Médio Inicial (Dias)</label>
+                                <input type="number" name="prazo_inicial" class="form-control" value="7">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Endereço</label>
+                                <input type="text" name="endereco" class="form-control">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-dark">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL GERENCIAR CATÁLOGO -->
+        <div class="modal fade" id="modalGerenciarCatalogo" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="tituloCatalogo">Gerenciar Catálogo</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Tabela de Peças Existentes -->
+                        <h6 class="fw-bold">Peças Fornecidas Atualmente</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Cód.</th>
+                                        <th>Peça</th>
+                                        <th>Preço (R$)</th>
+                                        <th>Prazo (Dias)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabelaPecasFornecedor">
+                                    <tr>
+                                        <td colspan="4" class="text-center">Carregando...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Formulário para Adicionar Novo Vínculo -->
+                        <h6 class="fw-bold border-top pt-3">Adicionar Peça ao Catálogo deste Fornecedor</h6>
+                        <form action="{{ url_for('admin.vincular_peca_fornecedor') }}" method="POST">
+                            <input type="hidden" name="fornecedor_id" id="inputFornecedorId">
+
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-5">
+                                    <label class="small text-muted">Selecionar Peça</label>
+                                    <select name="estoque_id" class="form-select form-select-sm" required>
+                                        <option value="" selected disabled>Escolha...</option>
+                                        {% for item in estoque_itens %}
+                                        <option value="{{ item.id }}">{{ item.nome }} ({{ item.codigo }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small text-muted">Preço Atual</label>
+                                    <input type="number" step="0.01" name="preco" class="form-control form-control-sm"
+                                        placeholder="0.00">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="small text-muted">Prazo</label>
+                                    <input type="number" name="prazo" class="form-control form-control-sm"
+                                        placeholder="Dias">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary btn-sm w-100">Vincular</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-{% endblock %}
+
+    <script>
+        function abrirCatalogo(id, nome) {
+            // Atualiza título e input hidden
+            document.getElementById('tituloCatalogo').innerText = "Catálogo: " + nome;
+            document.getElementById('inputFornecedorId').value = id;
+
+            // Limpa tabela
+            const tbody = document.getElementById('tabelaPecasFornecedor');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Carregando...</td></tr>';
+
+            // Abre Modal
+            var myModal = new bootstrap.Modal(document.getElementById('modalGerenciarCatalogo'));
+            myModal.show();
+
+            // Fetch API
+            fetch(`/admin/api/fornecedores/${id}/pecas`)
+                .then(response => response.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhuma peça vinculada.</td></tr>';
+                        return;
+                    }
+
+                    data.forEach(peca => {
+                        const tr = `
+                        <tr>
+                            <td>${peca.codigo}</td>
+                            <td>${peca.nome}</td>
+                            <td>R$ ${peca.preco.toFixed(2)}</td>
+                            <td>${peca.prazo} dias</td>
+                        </tr>
+                    `;
+                        tbody.innerHTML += tr;
+                    });
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-danger text-center">Erro ao carregar dados.</td></tr>';
+                });
+        }
+    </script>
+    {% endblock %}
