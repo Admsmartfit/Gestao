@@ -339,8 +339,8 @@ def buscar_pecas_fornecedor(id):
     
     for item in itens:
         resultado.append({
-            'codigo': item.estoque.codigo,
-            'nome': item.estoque.nome,
+            'codigo': item.peca.codigo,
+            'nome': item.peca.nome,
             'preco': float(item.preco_atual) if item.preco_atual else 0.0,
             'prazo': item.prazo_estimado_dias
         })

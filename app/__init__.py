@@ -49,6 +49,10 @@ def create_app():
     app.register_blueprint(os.bp)
     app.register_blueprint(terceirizados.bp) # Módulo 3
     
+    from app.routes import search, notifications
+    app.register_blueprint(search.bp)
+    app.register_blueprint(notifications.bp)
+    
     # --- CORREÇÃO: ROTA RAIZ (ROOT) ---
     @app.route('/')
     def root():

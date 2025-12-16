@@ -2,18 +2,22 @@
 
 :root {
     --primary: #2563eb;
-    /* Azul Moderno */
+    /* Azul Moderno - Mantido */
     --primary-hover: #1d4ed8;
-    --secondary: #64748b;
-    --background: #f1f5f9;
-    /* Cinza muito claro */
+    --secondary: #475569;
+    /* Darkened from Slate 500 */
+    --background: #f8fafc;
+    /* Slightly brighter background for better contrast */
     --surface: #ffffff;
-    --text-main: #1e293b;
-    --text-muted: #64748b;
+    --text-main: #0f172a;
+    /* Slate 900 - Darker for max contrast */
+    --text-muted: #475569;
+    /* Slate 600 - Darker readability */
     --border: #e2e8f0;
     --radius: 12px;
     --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.15);
+    /* Stronger hover shadow */
 }
 
 body {
@@ -69,8 +73,10 @@ body {
     background: transparent;
     border-bottom: 1px solid var(--border);
     padding: 1.25rem;
-    font-weight: 600;
+    font-weight: 700;
+    /* Bolder */
     color: var(--text-main);
+    font-size: 1.1rem;
 }
 
 .card-body {
@@ -115,27 +121,38 @@ body {
 
 .bg-success {
     background-color: #dcfce7 !important;
-    color: #166534;
+    color: #14532d;
+    /* Green 900 */
+    border: 1px solid #bbf7d0;
+    /* Subtle border for definition */
 }
 
 .bg-warning {
     background-color: #fef9c3 !important;
-    color: #854d0e;
+    color: #713f12;
+    /* Yellow 900 */
+    border: 1px solid #fde047;
 }
 
 .bg-danger {
     background-color: #fee2e2 !important;
-    color: #991b1b;
+    color: #7f1d1d;
+    /* Red 900 */
+    border: 1px solid #fecaca;
 }
 
 .bg-info {
     background-color: #e0f2fe !important;
-    color: #075985;
+    color: #0c4a6e;
+    /* Sky 900 */
+    border: 1px solid #bae6fd;
 }
 
 .bg-secondary {
     background-color: #f1f5f9 !important;
-    color: #475569;
+    color: #334155;
+    /* Slate 700 */
+    border: 1px solid #e2e8f0;
 }
 
 /* Tabelas */
@@ -144,12 +161,15 @@ body {
 }
 
 .table th {
-    font-weight: 600;
-    color: var(--text-muted);
+    font-weight: 700;
+    color: var(--text-main);
+    /* Darker than muted */
     font-size: 0.85rem;
     text-transform: uppercase;
     border-bottom: 2px solid var(--border);
-    background-color: #fafafa;
+    background-color: #f8fafc;
+    /* Matches improved background */
+    letter-spacing: 0.05em;
 }
 
 .table td {

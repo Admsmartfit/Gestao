@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from app.extensions import db
 from app.models.models import Unidade, Usuario
-from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, Equipamento, AnexosOS
+from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, Equipamento, AnexosOS, PedidoCompra
 from app.models.terceirizados_models import Terceirizado, ChamadoExterno
 from app.services.os_service import OSService
 from app.services.estoque_service import EstoqueService
@@ -127,6 +127,46 @@ def adicionar_peca(id):
             'mensagem': msg,
             'alerta': alerta_minimo
         })
+    except Exception as e:
+        return jsonify({'success': False, 'erro': str(e)}), 400
+
+@bp.route('/<int:id>/solicitar-compra-peca', methods=['POST'])
+@login_required
+def solicitar_compra_peca(id):
+    """Cria uma solicitação de compra (PedidoCompra) vinculada à peça."""
+    data = request.get_json()
+    try:
+        estoque_id = data.get('estoque_id')
+        quantidade = data.get('quantidade')
+        
+        # Pega o primeiro fornecedor vinculado à peça no catalogo ou um 'Fornecedor Geral'
+        from app.models.estoque_models import CatalogoFornecedor, Fornecedor
+        
+        cat = CatalogoFornecedor.query.filter_by(estoque_id=estoque_id).first()
+        if cat:
+            fornecedor_id = cat.fornecedor_id
+        else:
+            f = Fornecedor.query.first()
+            if not f:
+                return jsonify({'success': False, 'erro': 'Nenhum fornecedor cadastrado.'}), 400
+            fornecedor_id = f.id
+
+        novo_pedido = PedidoCompra(
+            fornecedor_id=fornecedor_id,
+            estoque_id=estoque_id,
+            quantidade=quantidade,
+            status='pendente',
+            data_solicitacao=datetime.utcnow()
+        )
+        
+        db.session.add(novo_pedido)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'mensagem': f'Solicitação de compra criada (Pedido #{novo_pedido.id}) para aprovação.'
+        })
+
     except Exception as e:
         return jsonify({'success': False, 'erro': str(e)}), 400
 

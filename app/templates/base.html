@@ -7,10 +7,15 @@
     <title>GMM | Gestão Moderna</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Toastify JS CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 </head>
 
 <body>
+    <!-- Hidden input to pass flash messages to JS -->
+    <input type="hidden" id="flash-messages"
+        data-messages='[{% for category, message in get_flashed_messages(with_categories=true) %}{"category": "{{ category }}", "message": "{{ message }}"}{{ "," if not loop.last }}{% endfor %}]'>
+
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('ponto.index') }}">
@@ -39,6 +44,27 @@
                 </ul>
 
                 <div class="d-flex align-items-center gap-3">
+                    <!-- Notification Bell -->
+                    <div class="position-relative">
+                        <div class="notification-bell" id="notifBell">
+                            <i class="bi bi-bell"></i>
+                            <span id="notifBadge" class="notification-badge d-none">0</span>
+                        </div>
+                        <div id="notifDropdown" class="notification-dropdown">
+                            <div class="notification-header">
+                                <span>Notificações</span>
+                                <small class="text-muted" style="cursor: pointer;"
+                                    onclick="fetchNotifications()">Atualizar</small>
+                            </div>
+                            <div id="notifList" class="notification-list">
+                                <!-- Items injected by JS -->
+                                <div class="text-center py-3">
+                                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <span class="text-muted small d-none d-lg-block">
                         <i class="bi bi-person-circle"></i> {{ current_user.nome.split()[0] }}
                     </span>
@@ -50,28 +76,312 @@
     </nav>
 
     <main class="container py-5">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="toast-container position-fixed top-0 end-0 p-3">
-            {% for category, message in messages %}
-            <div class="toast align-items-center text-white bg-{{ category }} border-0 show" role="alert">
-                <div class="d-flex">
-                    <div class="toast-body">
-                        {{ message }}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                        data-bs-dismiss="toast"></button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        {% endwith %}
+        <!-- Breadcrumb Contextual -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb p-3 bg-white rounded shadow-sm border">
+                {% block breadcrumb %}
+                <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
+                {% endblock %}
+            </ol>
+        </nav>
 
         {% block content %}{% endblock %}
     </main>
 
+    <!-- Global Loading Overlay -->
+    <div id="globalLoader" class="loading-overlay">
+        <div class="spinner-custom mb-3"></div>
+        <h5 class="fw-bold text-muted">Processando...</h5>
+    </div>
+
+    <!-- Global Search Modal -->
+    <div id="searchOverlay" class="search-overlay">
+        <div class="search-box">
+            <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="text" id="globalSearchInput" class="search-input"
+                    placeholder="Buscar OS, Peça, Equipamento... (ESC para fechar)" autocomplete="off">
+                <span class="shortcut-badge">ESC</span>
+            </div>
+            <div id="searchResults" class="search-results">
+                <!-- Results will be injected here -->
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-command fs-1"></i>
+                    <p class="mt-2">Digite para buscar...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+    <!-- Toast Notification, Loader & Search Logic -->
+    <script>
+        // --- GLOBAL SEARCH LOGIC ---
+        const searchOverlay = document.getElementById('searchOverlay');
+        const searchInput = document.getElementById('globalSearchInput');
+        const searchResults = document.getElementById('searchResults');
+        let searchTimeout = null;
+
+        // Toggle Search (Ctrl+K)
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                toggleSearch();
+            }
+            if (e.key === 'Escape' && searchOverlay.classList.contains('active')) {
+                toggleSearch();
+            }
+        });
+
+        // Close on click outside
+        searchOverlay.addEventListener('click', function (e) {
+            if (e.target === searchOverlay) toggleSearch();
+        });
+
+        function toggleSearch() {
+            searchOverlay.classList.toggle('active');
+            if (searchOverlay.classList.contains('active')) {
+                searchInput.focus();
+                searchInput.value = '';
+                searchResults.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-search fs-1"></i><p class="mt-2">Comece a digitar...</p></div>';
+            }
+        }
+
+        // Debounced Search
+        searchInput.addEventListener('input', function (e) {
+            clearTimeout(searchTimeout);
+            const query = e.target.value;
+
+            if (query.length < 2) {
+                searchResults.innerHTML = '<div class="text-center py-5 text-muted">Digite pelo menos 2 caracteres...</div>';
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                searchResults.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>';
+
+                try {
+                    const res = await fetch(`/api/global-search?q=${encodeURIComponent(query)}`);
+                    const data = await res.json();
+                    renderSearchResults(data);
+                } catch (err) {
+                    console.error(err);
+                    searchResults.innerHTML = '<div class="text-center py-4 text-danger">Erro ao buscar dados.</div>';
+                }
+            }, 300);
+        });
+
+        function renderSearchResults(data) {
+            searchResults.innerHTML = '';
+
+            const hasResults = Object.values(data).some(arr => arr.length > 0);
+            if (!hasResults) {
+                searchResults.innerHTML = '<div class="text-center py-5 text-muted">Nenhum resultado encontrado.</div>';
+                return;
+            }
+
+            if (data.os && data.os.length) {
+                searchResults.innerHTML += '<div class="search-category">Ordens de Serviço</div>';
+                data.os.forEach(item => {
+                    searchResults.appendChild(createResultItem(item, 'bi-tools'));
+                });
+            }
+
+            if (data.equipamentos && data.equipamentos.length) {
+                searchResults.innerHTML += '<div class="search-category">Equipamentos</div>';
+                data.equipamentos.forEach(item => {
+                    searchResults.appendChild(createResultItem(item, 'bi-hdd-network'));
+                });
+            }
+
+            if (data.pecas && data.pecas.length) {
+                searchResults.innerHTML += '<div class="search-category">Peças e Estoque</div>';
+                data.pecas.forEach(item => {
+                    searchResults.appendChild(createResultItem(item, 'bi-box-seam'));
+                });
+            }
+
+            if (data.usuarios && data.usuarios.length) {
+                searchResults.innerHTML += '<div class="search-category">Usuários</div>';
+                data.usuarios.forEach(item => {
+                    searchResults.appendChild(createResultItem(item, 'bi-person'));
+                });
+            }
+        }
+
+        function createResultItem(item, iconClass) {
+            const div = document.createElement('a');
+            div.href = item.url;
+            div.className = 'search-item';
+            div.innerHTML = `
+                <div class="search-item-content">
+                    <h5><i class="bi ${iconClass} me-2 text-primary"></i>${item.titulo}</h5>
+                    <p>${item.subtitulo}</p>
+                </div>
+                <i class="bi bi-chevron-right text-muted small"></i>
+            `;
+            return div;
+        }
+
+        // --- END GLOBAL SEARCH ---
+
+        // --- NOTIFICATION LOGIC ---
+        const notifBell = document.getElementById('notifBell');
+        const notifDropdown = document.getElementById('notifDropdown');
+        const notifBadge = document.getElementById('notifBadge');
+        const notifList = document.getElementById('notifList');
+
+        // Toggle Dropdown
+        notifBell.addEventListener('click', function (e) {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('active');
+        });
+
+        // Close on outside click
+        document.addEventListener('click', function (e) {
+            if (!notifDropdown.contains(e.target) && e.target !== notifBell) {
+                notifDropdown.classList.remove('active');
+            }
+        });
+
+        async function fetchNotifications() {
+            try {
+                const res = await fetch('/api/notifications');
+                const data = await res.json();
+
+                // Update Badge
+                if (data.count > 0) {
+                    notifBadge.innerText = data.count;
+                    notifBadge.classList.remove('d-none');
+                } else {
+                    notifBadge.classList.add('d-none');
+                }
+
+                // Render List
+                notifList.innerHTML = '';
+                if (data.count === 0) {
+                    notifList.innerHTML = '<div class="empty-notif">Nenhuma pendência.</div>';
+                    return;
+                }
+
+                data.alerts.forEach(alert => {
+                    const icon = alert.type === 'urgent' ? 'bi-exclamation-octagon-fill text-danger' : 'bi-exclamation-triangle-fill text-warning';
+                    const item = document.createElement('a');
+                    item.href = alert.url;
+                    item.className = `notification-item ${alert.type}`;
+                    item.innerHTML = `
+                        <div class="notification-icon">
+                            <i class="bi ${icon}"></i>
+                        </div>
+                        <div class="notif-content">
+                            <h6>${alert.type === 'urgent' ? 'Atenção' : 'Aviso'}</h6>
+                            <p>${alert.message}</p>
+                        </div>
+                    `;
+                    notifList.appendChild(item);
+                });
+
+            } catch (err) {
+                console.error("Error fetching notifications", err);
+            }
+        }
+
+        // Fetch on Load
+        document.addEventListener('DOMContentLoaded', fetchNotifications);
+
+        // --- END NOTIFICATION ---
+
+        // Global Loader Logic
+        const loader = document.getElementById('globalLoader');
+
+        // Show loader on Form Submit
+        document.addEventListener('submit', function (e) {
+            // Don't show if form has 'no-loader' class
+            if (!e.target.classList.contains('no-loader')) {
+                loader.classList.add('active');
+            }
+        });
+
+        // Global Toast API
+        const toast = {
+            success: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #00b09b, #96c93d)', options),
+            error: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #ff5f6d, #ffc371)', options),
+            warning: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #f8cdda, #1d2b64)', options), // Dark blue/pink as in example or custom
+            info: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #2193b0, #6dd5ed)', options)
+        };
+
+        function showToast(message, background, options = {}) {
+            let toastConfig = {
+                text: message,
+                duration: options.duration || 5000,
+                gravity: "top", // `top` or `bottom`
+                position: "right", // `left`, `center` or `right`
+                stopOnFocus: true, // Prevents dismissing of toast on hover
+                style: {
+                    background: background,
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)"
+                }
+            };
+
+            // Action Button Logic
+            if (options.action) {
+                toastConfig.onClick = options.action.onClick;
+                // Note: Toastify default onClick applies to entire toast. 
+                // To have a specific button, we might need custom HTML but basic Toastify onClick is clearer for now.
+                // If label provided, append to text?
+                if (options.action.label) {
+                    toastConfig.text = `${message}  [${options.action.label}]`;
+                }
+            }
+
+            Toastify(toastConfig).showToast();
+        }
+
+        // Process Backend Flash Messages
+        document.addEventListener("DOMContentLoaded", function () {
+            const flashData = document.getElementById('flash-messages');
+            if (flashData) {
+                try {
+                    const messages = JSON.parse(flashData.getAttribute('data-messages'));
+                    messages.forEach(msg => {
+                        // Map Flask categories to Toast types
+                        let type = 'info';
+                        if (msg.category === 'success') type = 'success';
+                        if (msg.category === 'danger' || msg.category === 'error') type = 'error';
+                        if (msg.category === 'warning') type = 'warning';
+
+                        toast[type](msg.message);
+                    });
+                } catch (e) {
+                    console.error("Error parsing flash messages", e);
+                }
+            }
+        });
+
+        // Keyboard Shortcuts
+        document.addEventListener('keydown', function (event) {
+            // Verifica se ALT está pressionado
+            if (event.altKey) {
+                switch (event.key.toLowerCase()) {
+                    case 'd': // Dashboard
+                        window.location.href = "{{ url_for('ponto.index') }}";
+                        break;
+                    case 'o': // Nova OS
+                        window.location.href = "{{ url_for('os.nova_os') }}";
+                        break;
+                    case 'e': // Estoque
+                        window.location.href = "{{ url_for('os.painel_estoque') }}";
+                        break;
+                    case 'c': // Configurações (Admin)
+                        window.location.href = "{{ url_for('admin.dashboard') }}";
+                        break;
+                }
+            }
+        });
+    </script>
 </body>
 
 </html>

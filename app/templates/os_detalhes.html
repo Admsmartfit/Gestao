@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('ponto.index') }}">Dashboard</a></li>
+<li class="breadcrumb-item active">Ordem de Serviço #{{ os.numero_os }}</li>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -81,15 +86,9 @@
         <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
             <h5 class="mb-0"><i class="bi bi-tools"></i> Peças e Serviços</h5>
             <div>
-                <!-- Botão Peças -->
-                <button class="btn btn-light btn-sm me-2" data-bs-toggle="modal" data-bs-target="#modalPeca">
-                    <i class="bi bi-box-seam"></i> Adicionar Peça
-                </button>
-
-                <!-- Botão Serviços Externos -->
-                <button class="btn btn-warning btn-sm me-2" data-bs-toggle="modal"
-                    data-bs-target="#modalSolicitarCompra">
-                    <i class="bi bi-person-plus-fill"></i> Terceirizados
+                <!-- Botão Unificado -->
+                <button class="btn btn-primary btn-sm me-2" data-bs-toggle="modal" data-bs-target="#modalRecursos">
+                    <i class="bi bi-plus-circle"></i> Adicionar Recursos (Peça/Serviço)
                 </button>
             </div>
         </div>
@@ -175,64 +174,78 @@
     {% endif %}
 </div>
 
-<div class="modal fade" id="modalPeca" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Adicionar Peça do Estoque</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label>Buscar Peça</label>
-                    <input type="text" id="buscaPeca" class="form-control" placeholder="Digite o nome...">
-                    <div id="listaSugestoes" class="list-group mt-1"></div>
-                </div>
-                <input type="hidden" id="estoqueIdSelecionado">
-                <div class="mb-3">
-                    <label>Quantidade (<span id="unidadeMedida">UN</span>)</label>
-                    <input type="number" id="qtdPeca" class="form-control" step="0.001" min="0.001">
-                    <small class="text-muted">Saldo disponível: <span id="saldoAtual">-</span></small>
-                </div>
-            </div>
-            <div class="modal-footer justify-content-between">
-                <button type="button" class="btn btn-outline-warning btn-sm" data-bs-dismiss="modal"
-                    data-bs-toggle="modal" data-bs-target="#modalSolicitarCompra">
-                    <i class="bi bi-cart-x"></i> Não tem no estoque? Solicitar Compra
-                </button>
-                <button type="button" class="btn btn-success" onclick="salvarPeca()">Adicionar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL SOLICITAÇÕES EXTERNAS (Novo) -->
-<div class="modal fade" id="modalSolicitarCompra" tabindex="-1">
+<div class="modal fade" id="modalRecursos" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title fw-bold"><i class="bi bi-cart-plus-fill"></i> Solicitações Externas</h5>
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-grid-fill"></i> Adicionar Recursos</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <ul class="nav nav-tabs mb-3" id="externalTab" role="tablist">
+                <ul class="nav nav-tabs mb-3" id="recursoTab" role="tablist">
                     <li class="nav-item">
-                        <button class="nav-link active" id="servico-tab" data-bs-toggle="tab"
-                            data-bs-target="#servico-pane" type="button">
-                            <i class="bi bi-person-gear"></i> Novo Serviço Terceirizado
+                        <button class="nav-link active" id="peca-tab" data-bs-toggle="tab" data-bs-target="#peca-pane"
+                            type="button">
+                            <i class="bi bi-box-seam"></i> Materiais e Peças
                         </button>
                     </li>
                     <li class="nav-item">
-                        <button class="nav-link" id="peca-tab" data-bs-toggle="tab" data-bs-target="#peca-pane"
+                        <button class="nav-link" id="servico-tab" data-bs-toggle="tab" data-bs-target="#servico-pane"
                             type="button">
-                            <i class="bi bi-box-seam"></i> Compra de Peça
+                            <i class="bi bi-person-gear"></i> Mão de Obra Externa
                         </button>
                     </li>
                 </ul>
 
-                <div class="tab-content" id="externalTabContent">
-                    <!-- ABA SERVIÇO -->
-                    <div class="tab-pane fade show active" id="servico-pane" role="tabpanel">
+                <div class="tab-content" id="recursoTabContent">
+                    <!-- ABA PEÇAS (CONSUMO OU COMPRA) -->
+                    <div class="tab-pane fade show active" id="peca-pane" role="tabpanel">
+                        <div class="mb-3">
+                            <label class="fw-bold">Buscar Peça</label>
+                            <input type="text" id="buscaPecaUnificada" class="form-control"
+                                placeholder="Digite o nome da peça...">
+                            <div id="listaSugestoesUnificada" class="list-group mt-1 position-absolute w-100"
+                                style="z-index: 1000;"></div>
+                        </div>
+
+                        <!-- Card de Ação Dinâmica -->
+                        <div id="acaoPecaCard" class="card d-none">
+                            <div class="card-body">
+                                <h6 class="card-title fw-bold" id="nomePecaSelecionada">Nome da Peça</h6>
+                                <p class="mb-2">
+                                    Status: <span id="statusEstoqueBadge" class="badge"></span>
+                                    <span class="text-muted ms-2">Saldo: <span id="saldoEstoqueValor"></span> <span
+                                            id="unidadePeca"></span></span>
+                                </p>
+
+                                <input type="hidden" id="idPecaSelecionada">
+
+                                <div class="row align-items-end">
+                                    <div class="col-md-4">
+                                        <label>Quantidade</label>
+                                        <input type="number" id="qtdPecaAcao" class="form-control" step="0.01"
+                                            value="1">
+                                    </div>
+                                    <div class="col-md-8 text-end">
+                                        <!-- Botão Contextual -->
+                                        <button id="btnConsumir" class="btn btn-success" onclick="salvarConsumoPeca()">
+                                            <i class="bi bi-box-arrow-down"></i> Adicionar e Baixar do Estoque
+                                        </button>
+                                        <button id="btnSolicitarCompra" class="btn btn-warning"
+                                            onclick="solicitarCompraPeca()">
+                                            <i class="bi bi-cart-plus"></i> Solicitar Compra
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="msgCompra" class="text-muted small mt-2 d-none">
+                                    * Item sem estoque suficiente. Será gerado um pedido de compra pendente.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ABA SERVIÇOS (MÃO DE OBRA) -->
+                    <div class="tab-pane fade" id="servico-pane" role="tabpanel">
                         <form action="{{ url_for('os.adicionar_tarefa_externa', id=os.id) }}" method="POST">
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Prestador / Terceirizado</label>
@@ -262,25 +275,6 @@
                             <div class="text-end">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-plus-lg"></i> Criar Tarefa
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- ABA PEÇA -->
-                    <div class="tab-pane fade" id="peca-pane" role="tabpanel">
-                        <div class="alert alert-info small">
-                            <i class="bi bi-info-circle"></i> Solicite a compra de peças que não temos em estoque.
-                        </div>
-                        <form>
-                            <div class="mb-3">
-                                <label class="form-label">Nome da Peça</label>
-                                <input type="text" class="form-control" placeholder="Ex: Correia dentada XP-200">
-                            </div>
-                            <div class="mb-3">
-                                <button type="button" class="btn btn-warning w-100"
-                                    onclick="alert('Funcionalidade de Cotação em desenvolvimento.')">
-                                    Buscar Fornecedores
                                 </button>
                             </div>
                         </form>
@@ -364,82 +358,148 @@
 </div>
 
 <script>
-    // --- LÓGICA DO ESTOQUE INTERNO (Busca AJAX) ---
-    document.getElementById('buscaPeca').addEventListener('input', async function (e) {
-        if (this.value.length < 2) return;
-        const res = await fetch(`/os/api/pecas/buscar?q=${this.value}`);
+    // --- LÓGICA UNIFICADA DE RECURSOS (PEÇAS) ---
+    const buscaInput = document.getElementById('buscaPecaUnificada');
+    const sugestoesDiv = document.getElementById('listaSugestoesUnificada');
+    const cardAcao = document.getElementById('acaoPecaCard');
+
+    // Elementos do Card
+    const nomePeca = document.getElementById('nomePecaSelecionada');
+    const saldoPeca = document.getElementById('saldoEstoqueValor');
+    const unidadePeca = document.getElementById('unidadePeca');
+    const statusBadge = document.getElementById('statusEstoqueBadge');
+    const idPecaField = document.getElementById('idPecaSelecionada');
+    const qtdField = document.getElementById('qtdPecaAcao');
+
+    // Botões e Msg
+    const btnConsumir = document.getElementById('btnConsumir');
+    const btnCompra = document.getElementById('btnSolicitarCompra');
+    const msgCompra = document.getElementById('msgCompra');
+
+    buscaInput.addEventListener('input', async function (e) {
+        const termo = this.value;
+        if (termo.length < 2) {
+            sugestoesDiv.innerHTML = '';
+            return;
+        }
+
+        // Show Skeleton
+        sugestoesDiv.innerHTML = `
+            <div class="list-group-item">
+                <div class="skeleton skeleton-text" style="width: 60%;"></div>
+                <div class="skeleton skeleton-text" style="width: 30%;"></div>
+            </div>
+            <div class="list-group-item">
+                <div class="skeleton skeleton-text" style="width: 50%;"></div>
+                <div class="skeleton skeleton-text" style="width: 25%;"></div>
+            </div>
+        `;
+
+        const res = await fetch(`/os/api/pecas/buscar?q=${termo}`);
         const data = await res.json();
 
-        const lista = document.getElementById('listaSugestoes');
-        lista.innerHTML = '';
+        sugestoesDiv.innerHTML = '';
+
+        if (data.length === 0) {
+            // Opcional: Sugerir cadastrar nova peça se não existir (fora do escopo atual)
+        }
 
         data.forEach(peca => {
             const item = document.createElement('a');
             item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
-            item.innerHTML = `<span>${peca.nome}</span> <span class="badge bg-secondary">${peca.saldo} ${peca.unidade}</span>`;
+            // Mostra o saldo na lista para facilitar
+            const corBadge = peca.saldo > 0 ? 'bg-success' : 'bg-danger';
+            item.innerHTML = `<span>${peca.nome}</span> <span class="badge ${corBadge}">${peca.saldo} ${peca.unidade}</span>`;
             item.style.cursor = 'pointer';
-            item.onclick = () => selecionarPeca(peca);
-            lista.appendChild(item);
+            item.onclick = () => selecionarPecaUnificada(peca);
+            sugestoesDiv.appendChild(item);
         });
     });
 
-    function selecionarPeca(peca) {
-        document.getElementById('buscaPeca').value = peca.nome;
-        document.getElementById('estoqueIdSelecionado').value = peca.id;
-        document.getElementById('unidadeMedida').innerText = peca.unidade;
-        document.getElementById('saldoAtual').innerText = peca.saldo;
-        document.getElementById('listaSugestoes').innerHTML = '';
-    }
+    function selecionarPecaUnificada(peca) {
+        sugestoesDiv.innerHTML = '';
+        buscaInput.value = peca.nome;
 
-    async function salvarPeca() {
-        const payload = {
-            estoque_id: document.getElementById('estoqueIdSelecionado').value,
-            quantidade: document.getElementById('qtdPeca').value
-        };
+        idPecaField.value = peca.id;
+        nomePeca.innerText = peca.nome;
+        saldoPeca.innerText = peca.saldo;
+        unidadePeca.innerText = peca.unidade;
 
-        const res = await fetch(`/os/{{ os.id }}/adicionar-peca`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        cardAcao.classList.remove('d-none');
 
-        const data = await res.json();
-        if (data.success) location.reload();
-        else alert(data.erro);
-    }
+        // Lógica de Estado (Estoque vs Compra)
+        if (peca.saldo > 0) {
+            // Tem estoque -> Fluxo de Consumo
+            statusBadge.innerText = 'Em Estoque';
+            statusBadge.className = 'badge bg-success';
 
-    // --- LÓGICA DO FORNECEDOR (Módulo 3) ---
-    async function buscarFornecedores(pecaId) {
-        if (!pecaId) return;
-
-        // Chama a nova API do Admin
-        const resp = await fetch(`/admin/api/fornecedores/buscar-por-peca/${pecaId}`);
-        const fornecedores = await resp.json();
-
-        const area = document.getElementById('areaFornecedores');
-        const tbody = document.getElementById('tabelaFornecedoresBody');
-        tbody.innerHTML = '';
-
-        if (fornecedores.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum fornecedor cadastrado para esta peça. Contate o Gerente.</td></tr>';
+            btnConsumir.classList.remove('d-none');
+            btnCompra.classList.add('d-none');
+            msgCompra.classList.add('d-none');
+            qtdField.max = peca.saldo; // Trava a qtd no saldo
         } else {
-            fornecedores.forEach(f => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                <td><strong>${f.nome}</strong></td>
-                <td class="text-primary fw-bold">~${f.prazo_medio_geral} dias</td>
-                <td><small>${f.historico_entregas} entregas realizadas</small></td>
-                <td>R$ ${f.preco.toFixed(2)}</td>
-                <td>
-                    <button class="btn btn-sm btn-success" onclick="alert('Pedido de compra enviado para aprovação!')">
-                        <i class="bi bi-cart-check"></i> Solicitar
-                    </button>
-                </td>
-            `;
-                tbody.appendChild(tr);
-            });
+            // Sem estoque -> Fluxo de Compra
+            statusBadge.innerText = 'Indisponível';
+            statusBadge.className = 'badge bg-danger';
+
+            btnConsumir.classList.add('d-none');
+            btnCompra.classList.remove('d-none');
+            msgCompra.classList.remove('d-none');
+            qtdField.removeAttribute('max'); // Compra é livre
         }
-        area.style.display = 'block';
     }
+
+    async function salvarConsumoPeca() {
+        const id = idPecaField.value;
+        const qtd = qtdField.value;
+        if (!id || !qtd) return;
+
+        const payload = { estoque_id: id, quantidade: qtd };
+        try {
+            const res = await fetch(`/os/{{ os.id }}/adicionar-peca`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) location.reload();
+            else alert('Erro: ' + data.erro);
+        } catch (e) {
+            alert('Erro de conexão');
+        }
+    }
+
+    async function solicitarCompraPeca() {
+        const id = idPecaField.value;
+        const qtd = qtdField.value;
+        if (!id || !qtd) return;
+
+        // Poderia abrir um prompt para observação/motivo
+
+        const payload = { estoque_id: id, quantidade: qtd };
+        try {
+            const res = await fetch(`/os/{{ os.id }}/solicitar-compra-peca`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(data.mensagem);
+                location.reload();
+            } else {
+                alert('Erro: ' + data.erro);
+            }
+        } catch (e) {
+            alert('Erro de conexão');
+        }
+    }
+
+    // Fecha a lista se clicar fora
+    document.addEventListener('click', function (e) {
+        if (e.target !== buscaInput) {
+            sugestoesDiv.innerHTML = '';
+        }
+    });
 </script>
 {% endblock %}
