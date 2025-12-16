@@ -3,39 +3,46 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GMM | Gestão Moderna</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <!-- Toastify JS CSS -->
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <!-- Hidden input to pass flash messages to JS -->
+    <div id="nprogress-bar"></div>
+
+    <div id="toast-container"></div>
+
     <input type="hidden" id="flash-messages"
         data-messages='[{% for category, message in get_flashed_messages(with_categories=true) %}{"category": "{{ category }}", "message": "{{ message }}"}{{ "," if not loop.last }}{% endfor %}]'>
 
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('ponto.index') }}">
-                <i class="bi bi-grid-fill me-2"></i>GMM
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('ponto.index') }}">
+                <i class="bi bi-grid-fill text-primary"></i>
+                <span>GMM</span>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <i class="bi bi-list fs-4"></i>
             </button>
 
             <div class="collapse navbar-collapse" id="navbarNav">
                 {% if current_user.is_authenticated %}
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('ponto.index') }}">Dashboard</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('os.painel_estoque') }}">Estoque</a>
                     </li>
-
-
                     {% if current_user.tipo == 'admin' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Configurações</a>
@@ -43,42 +50,54 @@
                     {% endif %}
                 </ul>
 
-                <div class="d-flex align-items-center gap-3">
-                    <!-- Notification Bell -->
-                    <div class="position-relative">
-                        <div class="notification-bell" id="notifBell">
-                            <i class="bi bi-bell"></i>
-                            <span id="notifBadge" class="notification-badge d-none">0</span>
-                        </div>
-                        <div id="notifDropdown" class="notification-dropdown">
-                            <div class="notification-header">
-                                <span>Notificações</span>
-                                <small class="text-muted" style="cursor: pointer;"
-                                    onclick="fetchNotifications()">Atualizar</small>
-                            </div>
-                            <div id="notifList" class="notification-list">
-                                <!-- Items injected by JS -->
-                                <div class="text-center py-3">
-                                    <div class="spinner-border spinner-border-sm text-primary"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="d-flex align-items-center gap-3 ms-auto pt-3 pt-lg-0">
 
-                    <span class="text-muted small d-none d-lg-block">
-                        <i class="bi bi-person-circle"></i> {{ current_user.nome.split()[0] }}
-                    </span>
-                    <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary btn-sm">Sair</a>
+                    <button class="btn btn-secondary btn-sm d-none d-md-flex align-items-center gap-2"
+                        onclick="SearchModule.open()">
+                        <i class="bi bi-search"></i>
+                        <span class="opacity-50 fw-normal small">Ctrl K</span>
+                    </button>
+                    <button class="btn btn-icon d-md-none text-muted p-2" onclick="SearchModule.open()">
+                        <i class="bi bi-search fs-5"></i>
+                    </button>
+
+                    <div class="dropdown">
+                        <button
+                            class="btn btn-link text-decoration-none p-0 d-flex align-items-center gap-2 dropdown-toggle"
+                            data-bs-toggle="dropdown">
+                            <div class="avatar-circle bg-primary bg-opacity-10 text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center"
+                                style="width: 36px; height: 36px;">
+                                {{ current_user.nome[0] | upper }}
+                            </div>
+                            <span class="d-lg-none fw-medium text-dark">{{ current_user.nome }}</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2"
+                            style="min-width: 200px;">
+                            <li>
+                                <h6 class="dropdown-header text-uppercase small fw-bold">Conta</h6>
+                            </li>
+                            <li><span class="dropdown-item-text fw-medium text-dark">{{ current_user.nome }}</span></li>
+                            <li><span class="dropdown-item-text text-muted small">{{ current_user.email }}</span></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <a class="dropdown-item text-danger d-flex align-items-center gap-2 rounded"
+                                    href="{{ url_for('auth.logout') }}">
+                                    <i class="bi bi-box-arrow-right"></i> Sair
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
                 {% endif %}
             </div>
         </div>
     </nav>
 
-    <main class="container py-5">
-        <!-- Breadcrumb Contextual -->
-        <nav aria-label="breadcrumb" class="mb-4">
-            <ol class="breadcrumb p-3 bg-white rounded shadow-sm border">
+    <main class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-4 d-none d-md-block">
+            <ol class="breadcrumb bg-white p-3 rounded shadow-sm border border-light">
                 {% block breadcrumb %}
                 <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
                 {% endblock %}
@@ -88,298 +107,278 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Global Loading Overlay -->
-    <div id="globalLoader" class="loading-overlay">
-        <div class="spinner-custom mb-3"></div>
-        <h5 class="fw-bold text-muted">Processando...</h5>
-    </div>
-
-    <!-- Global Search Modal -->
-    <div id="searchOverlay" class="search-overlay">
-        <div class="search-box">
-            <div class="search-input-wrapper">
-                <i class="bi bi-search"></i>
-                <input type="text" id="globalSearchInput" class="search-input"
-                    placeholder="Buscar OS, Peça, Equipamento... (ESC para fechar)" autocomplete="off">
-                <span class="shortcut-badge">ESC</span>
+    <div id="searchBackdrop" class="search-backdrop">
+        <div class="search-modal">
+            <div class="search-header">
+                <i class="bi bi-search text-primary fs-5"></i>
+                <input type="text" id="globalSearchInput" class="search-input" placeholder="Buscar OS, Peça, Técnico..."
+                    autocomplete="off">
+                <span class="badge bg-secondary text-light ms-auto d-none d-md-inline"
+                    style="font-size: 0.7rem;">ESC</span>
             </div>
+
             <div id="searchResults" class="search-results">
-                <!-- Results will be injected here -->
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-command fs-1"></i>
-                    <p class="mt-2">Digite para buscar...</p>
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-command fs-3 d-block mb-3 opacity-25"></i>
+                    <p class="mb-0">Digite para buscar em todo o sistema...</p>
                 </div>
+            </div>
+
+            <div class="search-footer bg-light p-2 border-top d-flex justify-content-between px-3 small text-muted">
+                <span><i class="bi bi-arrow-return-left me-1"></i> Selecionar</span>
+                <span><i class="bi bi-arrows-vertical me-1"></i> Navegar</span>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
-    <!-- Toast Notification, Loader & Search Logic -->
     <script>
-        // --- GLOBAL SEARCH LOGIC ---
-        const searchOverlay = document.getElementById('searchOverlay');
-        const searchInput = document.getElementById('globalSearchInput');
-        const searchResults = document.getElementById('searchResults');
-        let searchTimeout = null;
+        /**
+         * MODULE 1: NOTIFICATIONS (Custom Vanilla Implementation)
+         * Substitutes Toastify.js for lighter, tailored solution.
+         */
+        const ToastModule = (() => {
+            const container = document.getElementById('toast-container');
+            const icons = {
+                success: 'check-circle-fill',
+                warning: 'exclamation-triangle-fill',
+                danger: 'x-circle-fill',
+                info: 'info-circle-fill'
+            };
 
-        // Toggle Search (Ctrl+K)
-        document.addEventListener('keydown', function (e) {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-                e.preventDefault();
-                toggleSearch();
+            function show(message, type = 'info') {
+                // Map Flask categories to visual types
+                if (type === 'error') type = 'danger';
+
+                // Limit stack to 3 items
+                if (container.childElementCount >= 3) {
+                    remove(container.firstElementChild);
+                }
+
+                const toast = document.createElement('div');
+                toast.className = `gmm-toast ${type}`;
+                toast.innerHTML = `
+                    <i class="bi bi-${icons[type] || icons.info} fs-5 text-${type === 'info' ? 'primary' : type}"></i>
+                    <div class="gmm-toast-content">
+                        <div class="gmm-toast-title">${type === 'danger' ? 'Erro' : type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                        <div class="gmm-toast-msg">${message}</div>
+                    </div>
+                    <button class="btn-close btn-sm ms-2" onclick="this.parentElement.remove()" aria-label="Fechar"></button>
+                `;
+
+                container.appendChild(toast);
+
+                // Auto dismiss (4s)
+                setTimeout(() => remove(toast), 4000);
             }
-            if (e.key === 'Escape' && searchOverlay.classList.contains('active')) {
-                toggleSearch();
+
+            function remove(el) {
+                if (!el) return;
+                el.style.animation = 'fadeOutRight 0.3s forwards';
+                el.addEventListener('animationend', () => el.remove());
+            }
+
+            return { show };
+        })();
+
+        // Auto-initialize Flask Flash Messages
+        document.addEventListener("DOMContentLoaded", () => {
+            const data = document.getElementById('flash-messages');
+            if (data) {
+                try {
+                    JSON.parse(data.getAttribute('data-messages')).forEach(msg => {
+                        ToastModule.show(msg.message, msg.category);
+                    });
+                } catch (e) { console.error("Flash msg parse error", e); }
             }
         });
 
-        // Close on click outside
-        searchOverlay.addEventListener('click', function (e) {
-            if (e.target === searchOverlay) toggleSearch();
-        });
+        /**
+         * MODULE 2: GLOBAL SEARCH (Modal & Keyboard Nav)
+         */
+        const SearchModule = (() => {
+            const backdrop = document.getElementById('searchBackdrop');
+            const input = document.getElementById('globalSearchInput');
+            const results = document.getElementById('searchResults');
+            let debounceTimer;
+            let selectedIndex = -1;
 
-        function toggleSearch() {
-            searchOverlay.classList.toggle('active');
-            if (searchOverlay.classList.contains('active')) {
-                searchInput.focus();
-                searchInput.value = '';
-                searchResults.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-search fs-1"></i><p class="mt-2">Comece a digitar...</p></div>';
-            }
-        }
-
-        // Debounced Search
-        searchInput.addEventListener('input', function (e) {
-            clearTimeout(searchTimeout);
-            const query = e.target.value;
-
-            if (query.length < 2) {
-                searchResults.innerHTML = '<div class="text-center py-5 text-muted">Digite pelo menos 2 caracteres...</div>';
-                return;
+            function open() {
+                backdrop.classList.add('active');
+                input.focus();
+                loadHistory();
             }
 
-            searchTimeout = setTimeout(async () => {
-                searchResults.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>';
+            function close() {
+                backdrop.classList.remove('active');
+                input.value = '';
+                selectedIndex = -1;
+            }
+
+            // Simple History Management
+            function loadHistory() {
+                const history = JSON.parse(localStorage.getItem('gmm_search_history') || '[]');
+                if (!input.value && history.length > 0) {
+                    renderResults({ 'Histórico': history.map(t => ({ titulo: t, tipo: 'history', url: '#' })) });
+                } else if (!input.value) {
+                    results.innerHTML = `<div class="p-5 text-center text-muted small">Sem histórico recente.</div>`;
+                }
+            }
+
+            function saveHistory(term) {
+                if (!term || term.length < 3) return;
+                let history = JSON.parse(localStorage.getItem('gmm_search_history') || '[]');
+                history = [term, ...history.filter(h => h !== term)].slice(0, 5);
+                localStorage.setItem('gmm_search_history', JSON.stringify(history));
+            }
+
+            async function performSearch(query) {
+                results.innerHTML = `<div class="p-4 text-center"><div class="spinner-border text-primary" role="status"></div></div>`;
 
                 try {
                     const res = await fetch(`/api/global-search?q=${encodeURIComponent(query)}`);
+                    if (!res.ok) throw new Error('API Error');
                     const data = await res.json();
-                    renderSearchResults(data);
-                } catch (err) {
-                    console.error(err);
-                    searchResults.innerHTML = '<div class="text-center py-4 text-danger">Erro ao buscar dados.</div>';
+                    renderResults(data);
+                } catch (e) {
+                    results.innerHTML = `<div class="p-4 text-center text-danger small">Erro ao buscar dados. Tente novamente.</div>`;
                 }
-            }, 300);
-        });
-
-        function renderSearchResults(data) {
-            searchResults.innerHTML = '';
-
-            const hasResults = Object.values(data).some(arr => arr.length > 0);
-            if (!hasResults) {
-                searchResults.innerHTML = '<div class="text-center py-5 text-muted">Nenhum resultado encontrado.</div>';
-                return;
             }
 
-            if (data.os && data.os.length) {
-                searchResults.innerHTML += '<div class="search-category">Ordens de Serviço</div>';
-                data.os.forEach(item => {
-                    searchResults.appendChild(createResultItem(item, 'bi-tools'));
-                });
-            }
+            function renderResults(data) {
+                results.innerHTML = '';
+                let hasResults = false;
 
-            if (data.equipamentos && data.equipamentos.length) {
-                searchResults.innerHTML += '<div class="search-category">Equipamentos</div>';
-                data.equipamentos.forEach(item => {
-                    searchResults.appendChild(createResultItem(item, 'bi-hdd-network'));
-                });
-            }
+                for (const [category, items] of Object.entries(data)) {
+                    if (items && items.length > 0) {
+                        hasResults = true;
+                        // Category Header
+                        const catTitle = document.createElement('div');
+                        catTitle.className = 'search-category-title';
+                        catTitle.textContent = category === 'os' ? 'Ordens de Serviço' : category;
+                        results.appendChild(catTitle);
 
-            if (data.pecas && data.pecas.length) {
-                searchResults.innerHTML += '<div class="search-category">Peças e Estoque</div>';
-                data.pecas.forEach(item => {
-                    searchResults.appendChild(createResultItem(item, 'bi-box-seam'));
-                });
-            }
+                        // Items
+                        items.forEach(item => {
+                            const el = document.createElement('a');
+                            el.href = item.url;
+                            el.className = 'search-item';
+                            el.innerHTML = `
+                                <i class="bi bi-${getIcon(item.tipo)} text-secondary fs-5"></i>
+                                <div>
+                                    <div class="fw-semibold text-dark">${highlight(item.titulo, input.value)}</div>
+                                    ${item.subtitulo ? `<div class="small text-muted">${item.subtitulo}</div>` : ''}
+                                </div>
+                                <i class="bi bi-chevron-right ms-auto text-light-gray small"></i>
+                            `;
 
-            if (data.usuarios && data.usuarios.length) {
-                searchResults.innerHTML += '<div class="search-category">Usuários</div>';
-                data.usuarios.forEach(item => {
-                    searchResults.appendChild(createResultItem(item, 'bi-person'));
-                });
-            }
-        }
-
-        function createResultItem(item, iconClass) {
-            const div = document.createElement('a');
-            div.href = item.url;
-            div.className = 'search-item';
-            div.innerHTML = `
-                <div class="search-item-content">
-                    <h5><i class="bi ${iconClass} me-2 text-primary"></i>${item.titulo}</h5>
-                    <p>${item.subtitulo}</p>
-                </div>
-                <i class="bi bi-chevron-right text-muted small"></i>
-            `;
-            return div;
-        }
-
-        // --- END GLOBAL SEARCH ---
-
-        // --- NOTIFICATION LOGIC ---
-        const notifBell = document.getElementById('notifBell');
-        const notifDropdown = document.getElementById('notifDropdown');
-        const notifBadge = document.getElementById('notifBadge');
-        const notifList = document.getElementById('notifList');
-
-        // Toggle Dropdown
-        notifBell.addEventListener('click', function (e) {
-            e.stopPropagation();
-            notifDropdown.classList.toggle('active');
-        });
-
-        // Close on outside click
-        document.addEventListener('click', function (e) {
-            if (!notifDropdown.contains(e.target) && e.target !== notifBell) {
-                notifDropdown.classList.remove('active');
-            }
-        });
-
-        async function fetchNotifications() {
-            try {
-                const res = await fetch('/api/notifications');
-                const data = await res.json();
-
-                // Update Badge
-                if (data.count > 0) {
-                    notifBadge.innerText = data.count;
-                    notifBadge.classList.remove('d-none');
-                } else {
-                    notifBadge.classList.add('d-none');
+                            // History Click Handler
+                            el.onclick = (e) => {
+                                if (item.tipo === 'history') {
+                                    e.preventDefault();
+                                    input.value = item.titulo;
+                                    performSearch(item.titulo);
+                                } else {
+                                    saveHistory(input.value);
+                                }
+                            };
+                            results.appendChild(el);
+                        });
+                    }
                 }
 
-                // Render List
-                notifList.innerHTML = '';
-                if (data.count === 0) {
-                    notifList.innerHTML = '<div class="empty-notif">Nenhuma pendência.</div>';
+                if (!hasResults) {
+                    results.innerHTML = `<div class="p-5 text-center text-muted">Nenhum resultado encontrado para "<strong>${input.value}</strong>".</div>`;
+                }
+            }
+
+            function getIcon(type) {
+                const map = {
+                    'Ordem de Serviço': 'tools',
+                    'Equipamento': 'hdd-network',
+                    'Peça': 'box-seam',
+                    'Usuário': 'person',
+                    'Fornecedor': 'truck',
+                    'Terceirizado': 'briefcase',
+                    'history': 'clock-history'
+                };
+                return map[type] || 'search';
+            }
+
+            function highlight(text, term) {
+                if (!term || term.length < 2) return text;
+                const regex = new RegExp(`(${term})`, 'gi');
+                return text.replace(regex, '<span class="bg-warning bg-opacity-25 text-primary rounded px-1">$1</span>');
+            }
+
+            // Events
+            input.addEventListener('input', (e) => {
+                clearTimeout(debounceTimer);
+                const val = e.target.value.trim();
+                if (val.length < 2) {
+                    loadHistory();
                     return;
                 }
+                debounceTimer = setTimeout(() => performSearch(val), 300); // 300ms Debounce
+            });
 
-                data.alerts.forEach(alert => {
-                    const icon = alert.type === 'urgent' ? 'bi-exclamation-octagon-fill text-danger' : 'bi-exclamation-triangle-fill text-warning';
-                    const item = document.createElement('a');
-                    item.href = alert.url;
-                    item.className = `notification-item ${alert.type}`;
-                    item.innerHTML = `
-                        <div class="notification-icon">
-                            <i class="bi ${icon}"></i>
-                        </div>
-                        <div class="notif-content">
-                            <h6>${alert.type === 'urgent' ? 'Atenção' : 'Aviso'}</h6>
-                            <p>${alert.message}</p>
-                        </div>
-                    `;
-                    notifList.appendChild(item);
-                });
-
-            } catch (err) {
-                console.error("Error fetching notifications", err);
-            }
-        }
-
-        // Fetch on Load
-        document.addEventListener('DOMContentLoaded', fetchNotifications);
-
-        // --- END NOTIFICATION ---
-
-        // Global Loader Logic
-        const loader = document.getElementById('globalLoader');
-
-        // Show loader on Form Submit
-        document.addEventListener('submit', function (e) {
-            // Don't show if form has 'no-loader' class
-            if (!e.target.classList.contains('no-loader')) {
-                loader.classList.add('active');
-            }
-        });
-
-        // Global Toast API
-        const toast = {
-            success: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #00b09b, #96c93d)', options),
-            error: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #ff5f6d, #ffc371)', options),
-            warning: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #f8cdda, #1d2b64)', options), // Dark blue/pink as in example or custom
-            info: (msg, options = {}) => showToast(msg, 'linear-gradient(to right, #2193b0, #6dd5ed)', options)
-        };
-
-        function showToast(message, background, options = {}) {
-            let toastConfig = {
-                text: message,
-                duration: options.duration || 5000,
-                gravity: "top", // `top` or `bottom`
-                position: "right", // `left`, `center` or `right`
-                stopOnFocus: true, // Prevents dismissing of toast on hover
-                style: {
-                    background: background,
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)"
+            document.addEventListener('keydown', (e) => {
+                // Shortcut Ctrl/Cmd + K
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    open();
                 }
-            };
 
-            // Action Button Logic
-            if (options.action) {
-                toastConfig.onClick = options.action.onClick;
-                // Note: Toastify default onClick applies to entire toast. 
-                // To have a specific button, we might need custom HTML but basic Toastify onClick is clearer for now.
-                // If label provided, append to text?
-                if (options.action.label) {
-                    toastConfig.text = `${message}  [${options.action.label}]`;
+                if (!backdrop.classList.contains('active')) return;
+
+                // Close on ESC
+                if (e.key === 'Escape') close();
+
+                // Navigation
+                const items = results.querySelectorAll('.search-item');
+                if (items.length === 0) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex + 1) % items.length;
+                    updateSelection(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+                    updateSelection(items);
+                } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                    items[selectedIndex].click();
+                }
+            });
+
+            function updateSelection(items) {
+                items.forEach(i => i.classList.remove('selected'));
+                if (items[selectedIndex]) {
+                    items[selectedIndex].classList.add('selected');
+                    items[selectedIndex].scrollIntoView({ block: 'nearest' });
                 }
             }
 
-            Toastify(toastConfig).showToast();
-        }
+            backdrop.addEventListener('click', (e) => {
+                if (e.target === backdrop) close();
+            });
 
-        // Process Backend Flash Messages
-        document.addEventListener("DOMContentLoaded", function () {
-            const flashData = document.getElementById('flash-messages');
-            if (flashData) {
-                try {
-                    const messages = JSON.parse(flashData.getAttribute('data-messages'));
-                    messages.forEach(msg => {
-                        // Map Flask categories to Toast types
-                        let type = 'info';
-                        if (msg.category === 'success') type = 'success';
-                        if (msg.category === 'danger' || msg.category === 'error') type = 'error';
-                        if (msg.category === 'warning') type = 'warning';
+            return { open, close };
+        })();
 
-                        toast[type](msg.message);
-                    });
-                } catch (e) {
-                    console.error("Error parsing flash messages", e);
-                }
-            }
-        });
+        /**
+         * MODULE 3: LOADING STATES
+         * Linear progress bar at top for navigation feedback
+         */
+        window.addEventListener('beforeunload', () => {
+            const bar = document.getElementById('nprogress-bar');
+            bar.style.width = '30%';
+            bar.style.opacity = '1';
 
-        // Keyboard Shortcuts
-        document.addEventListener('keydown', function (event) {
-            // Verifica se ALT está pressionado
-            if (event.altKey) {
-                switch (event.key.toLowerCase()) {
-                    case 'd': // Dashboard
-                        window.location.href = "{{ url_for('ponto.index') }}";
-                        break;
-                    case 'o': // Nova OS
-                        window.location.href = "{{ url_for('os.nova_os') }}";
-                        break;
-                    case 'e': // Estoque
-                        window.location.href = "{{ url_for('os.painel_estoque') }}";
-                        break;
-                    case 'c': // Configurações (Admin)
-                        window.location.href = "{{ url_for('admin.dashboard') }}";
-                        break;
-                }
-            }
+            // Artificial increments for perceived speed
+            setTimeout(() => bar.style.width = '50%', 200);
+            setTimeout(() => bar.style.width = '70%', 500);
         });
     </script>
 </body>

@@ -1,26 +1,69 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-body">
-                <h3 class="text-center mb-4">Acesso GMM</h3>
+<div class="d-flex align-items-center justify-content-center min-vh-100 py-5" style="margin-top: -64px;">
+    <div class="w-100" style="max-width: 400px;">
+
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-3 shadow-sm mb-3"
+                style="width: 56px; height: 56px;">
+                <i class="bi bi-grid-fill fs-3"></i>
+            </div>
+            <h3 class="fw-bold text-dark">Bem-vindo ao GMM</h3>
+            <p class="text-muted">Faça login para acessar o sistema.</p>
+        </div>
+
+        <div class="card border-0 shadow-lg">
+            <div class="card-body p-4 p-md-5">
                 <form method="POST">
                     <div class="mb-3">
-                        <label class="form-label">Nome de Usuário</label>
-                        <input type="text" class="form-control" name="username" placeholder="Digite seu login" required
-                            autofocus>
+                        <label class="form-label">Usuário</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 text-muted"><i
+                                    class="bi bi-person"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" name="username"
+                                placeholder="Digite seu login" required autofocus>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Senha</label>
-                        <input type="password" class="form-control" name="senha" required>
+
+                    <div class="mb-4">
+                        <label class="form-label d-flex justify-content-between">
+                            Senha
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 text-muted"><i
+                                    class="bi bi-lock"></i></span>
+                            <input type="password" class="form-control border-start-0 ps-0" name="senha"
+                                placeholder="••••••" required>
+                        </div>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Entrar</button>
+
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                            Entrar no Sistema
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
+
+        <div class="text-center mt-4 text-muted small">
+            &copy; 2025 Gestão Moderna de Manutenção
+        </div>
     </div>
 </div>
+
+<style>
+    /* Pequeno ajuste para garantir que o container flutue corretamente */
+    body {
+        background-color: #f8fafc;
+    }
+
+    nav.navbar,
+    #nprogress-bar {
+        display: none !important;
+    }
+
+    /* Esconde navbar no login */
+</style>
 {% endblock %}

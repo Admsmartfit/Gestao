@@ -1,237 +1,228 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
-    <h2 class="mb-4">Nova Ordem de Serviço</h2>
-
-    <form method="POST" enctype="multipart/form-data" id="formOS">
-
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                <i class="bi bi-geo-alt-fill"></i> 1. Localização e Equipamento
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">1. Selecione a Unidade</label>
-                        <select name="unidade_id" id="selectUnidade" class="form-select" required
-                            onchange="carregarEquipamentos()">
-                            <option value="" disabled selected>Escolha a unidade...</option>
-                            {% for u in unidades %}
-                            <option value="{{ u.id }}">{{ u.nome }}</option>
-                            {% endfor %}
-                        </select>
-                        <small class="text-muted">O técnico só pode atender na unidade presente.</small>
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Técnico Responsável</label>
-                        <select name="tecnico_id" class="form-select" required>
-                            {% for t in tecnicos %}
-                            <option value="{{ t.id }}" {% if t.id==current_user.id %}selected{% endif %}>{{ t.nome }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="col-12">
-                        <hr>
-                    </div>
-
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold">2. Tipo de Equipamento</label>
-                        <select id="selectCategoria" class="form-select" onchange="carregarEquipamentos()">
-                            <option value="" selected>Todos os Tipos</option>
-                            <option value="cardio">Cardio (Esteiras, Bikes)</option>
-                            <option value="musculacao">Musculação</option>
-                            <option value="predial">Predial (Ar, Luz, etc.)</option>
-                            <option value="diversos">Diversos</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-8 mb-3">
-                        <label class="form-label fw-bold">3. Selecione o Equipamento</label>
-                        <select name="equipamento_id" id="selectEquipamento" class="form-select" required disabled>
-                            <option value="">Selecione primeiro a Unidade...</option>
-                        </select>
-                    </div>
-
-                    <div class="col-12">
-                        <hr>
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label class="text-danger fw-bold">Prazo Limite para Conclusão</label>
-                        <input type="datetime-local" name="prazo_conclusao" class="form-control border-danger" required>
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label>Prioridade</label>
-                        <select name="prioridade" class="form-select">
-                            <option value="baixa">Baixa</option>
-                            <option value="media" selected>Média</option>
-                            <option value="alta">Alta</option>
-                            <option value="urgente">Urgente</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <h2 class="mb-0">Nova Ordem de Serviço</h2>
+            <a href="{{ url_for('ponto.index') }}" class="btn btn-outline-secondary btn-sm">Cancelar</a>
         </div>
 
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-secondary text-white">
-                <i class="bi bi-tools"></i> 2. Detalhes do Problema
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Tipo de Manutenção</label>
-                    <select name="tipo_manutencao" class="form-select">
-                        <option value="corretiva">Corretiva (Quebrou)</option>
-                        <option value="preventiva">Preventiva (Revisão)</option>
-                    </select>
-                </div>
+        <form method="POST" enctype="multipart/form-data" id="formOS">
 
-                <div class="mb-3">
-                    <label class="form-label d-flex justify-content-between align-items-center">
-                        Descrição Detalhada do Problema
-                        <button type="button" class="btn btn-sm btn-outline-primary"
-                            onclick="iniciarDitado('descricao_problema')">
-                            <i class="bi bi-mic-fill"></i> Ditar
-                        </button>
-                    </label>
-                    <div class="input-group">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 text-primary"><i class="bi bi-geo-alt-fill me-2"></i>Local e Equipamento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Unidade</label>
+                            <select name="unidade_id" id="selectUnidade" class="form-select" required
+                                onchange="carregarEquipamentos()">
+                                <option value="" disabled selected>Selecione...</option>
+                                {% for u in unidades %}
+                                <option value="{{ u.id }}">{{ u.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Técnico Responsável</label>
+                            <select name="tecnico_id" class="form-select" required>
+                                {% for t in tecnicos %}
+                                <option value="{{ t.id }}" {% if t.id==current_user.id %}selected{% endif %}>{{ t.nome
+                                    }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <hr class="text-muted opacity-25 my-1">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Filtro de Categoria</label>
+                            <select id="selectCategoria" class="form-select" onchange="carregarEquipamentos()">
+                                <option value="" selected>Todas</option>
+                                <option value="cardio">Cardio</option>
+                                <option value="musculacao">Musculação</option>
+                                <option value="predial">Predial</option>
+                                <option value="diversos">Diversos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Equipamento</label>
+                            <select name="equipamento_id" id="selectEquipamento" class="form-select" required disabled>
+                                <option value="">Selecione a Unidade primeiro...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 text-secondary"><i class="bi bi-tools me-2"></i>Detalhes do Problema</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Manutenção</label>
+                            <select name="tipo_manutencao" class="form-select">
+                                <option value="corretiva">Corretiva (Quebrou)</option>
+                                <option value="preventiva">Preventiva (Revisão)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Prioridade</label>
+                            <select name="prioridade" class="form-select">
+                                <option value="baixa">Baixa</option>
+                                <option value="media" selected>Média</option>
+                                <option value="alta">Alta</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-danger">Prazo Limite</label>
+                            <input type="datetime-local" name="prazo_conclusao"
+                                class="form-control border-danger-subtle" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label d-flex justify-content-between align-items-center">
+                            Descrição do Problema
+                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-0"
+                                onclick="iniciarDitado('descricao_problema')">
+                                <i class="bi bi-mic-fill text-primary"></i> <span id="micText">Ditar Texto</span>
+                            </button>
+                        </label>
                         <textarea name="descricao_problema" id="descricao_problema" class="form-control" rows="4"
-                            required placeholder="Descreva o defeito..."></textarea>
+                            required placeholder="Descreva o defeito detalhadamente..."></textarea>
+                        <div id="micStatus" class="form-text text-primary d-none fw-bold"><i
+                                class="bi bi-record-circle me-1 blink"></i> Ouvindo...</div>
                     </div>
-                    <small id="micStatus" class="text-muted" style="display:none;">Ouvindo...</small>
-                </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Fotos (Antes do Serviço)</label>
-                    <input type="file" name="fotos_antes" class="form-control" multiple accept="image/*"
-                        id="inputFotos">
-                    <div id="previewFotos" class="d-flex mt-2 gap-2 flex-wrap"></div>
-                </div>
-
-
-            </div>
-
-
-            <div class="card shadow-sm mb-4">
-                <div class="card-body bg-light border-0">
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success btn-lg">
-                            <i class="bi bi-check-circle-fill"></i> Criar Ordem de Serviço
-                        </button>
-                        <a href="{{ url_for('ponto.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+                    <div class="mb-3">
+                        <label class="form-label">Fotos Iniciais</label>
+                        <input type="file" name="fotos_antes" class="form-control" multiple accept="image/*"
+                            id="inputFotos">
+                        <div id="previewFotos" class="d-flex mt-3 gap-2 overflow-auto pb-2"></div>
                     </div>
                 </div>
             </div>
 
-            <script>
-                // Lógica para carregar equipamentos via AJAX
-                async function carregarEquipamentos() {
-                    const unidadeId = document.getElementById('selectUnidade').value;
-                    const categoria = document.getElementById('selectCategoria').value;
-                    const selectEquip = document.getElementById('selectEquipamento');
+            <div class="d-grid gap-2 mb-5">
+                <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                    <i class="bi bi-check-lg me-2"></i> Criar Ordem de Serviço
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
-                    // Se não tiver unidade selecionada, bloqueia o campo
-                    if (!unidadeId) {
-                        selectEquip.innerHTML = '<option value="">Selecione primeiro a Unidade...</option>';
-                        selectEquip.disabled = true;
-                        return;
-                    }
+<script>
+    // Lógica de equipamentos (AJAX) - Mantida funcionalidade, ajustada UI
+    async function carregarEquipamentos() {
+        const unidadeId = document.getElementById('selectUnidade').value;
+        const categoria = document.getElementById('selectCategoria').value;
+        const selectEquip = document.getElementById('selectEquipamento');
 
-                    // Estado de carregamento
-                    selectEquip.disabled = true;
-                    selectEquip.innerHTML = '<option>Carregando equipamentos...</option>';
+        if (!unidadeId) {
+            selectEquip.innerHTML = '<option value="">Selecione primeiro a Unidade...</option>';
+            selectEquip.disabled = true;
+            return;
+        }
 
-                    try {
-                        // Monta URL da API criada no backend
-                        let url = `/os/api/equipamentos/filtro?unidade_id=${unidadeId}`;
-                        if (categoria) {
-                            url += `&categoria=${categoria}`;
-                        }
+        selectEquip.disabled = true;
+        selectEquip.innerHTML = '<option>Carregando...</option>';
 
-                        const response = await fetch(url);
-                        const equipamentos = await response.json();
+        try {
+            let url = `/os/api/equipamentos/filtro?unidade_id=${unidadeId}`;
+            if (categoria) url += `&categoria=${categoria}`;
 
-                        // Limpa e popula
-                        selectEquip.innerHTML = '<option value="" selected disabled>Escolha o equipamento...</option>';
+            const response = await fetch(url);
+            const equipamentos = await response.json();
 
-                        if (equipamentos.length === 0) {
-                            selectEquip.innerHTML += '<option value="" disabled>Nenhum equipamento encontrado nesta categoria.</option>';
-                        } else {
-                            equipamentos.forEach(eq => {
-                                const option = document.createElement('option');
-                                option.value = eq.id;
-                                option.text = eq.nome;
-                                selectEquip.appendChild(option);
-                            });
-                        }
-                        selectEquip.disabled = false;
-
-                    } catch (error) {
-                        console.error('Erro:', error);
-                        selectEquip.innerHTML = '<option>Erro ao carregar lista.</option>';
-                    }
-                }
-
-                // Lógica simples para preview de fotos
-                document.getElementById('inputFotos').addEventListener('change', function (e) {
-                    const container = document.getElementById('previewFotos');
-                    container.innerHTML = '';
-                    for (let file of this.files) {
-                        let reader = new FileReader();
-                        reader.onload = function (event) {
-                            let img = document.createElement('img');
-                            img.src = event.target.result;
-                            img.style.height = '100px';
-                            img.className = 'img-thumbnail';
-                            container.appendChild(img);
-                        }
-                        reader.readAsDataURL(file);
-                    }
+            selectEquip.innerHTML = '<option value="" selected disabled>Escolha o equipamento...</option>';
+            if (equipamentos.length === 0) {
+                selectEquip.innerHTML += '<option value="" disabled>Nenhum equipamento encontrado.</option>';
+            } else {
+                equipamentos.forEach(eq => {
+                    const option = document.createElement('option');
+                    option.value = eq.id;
+                    option.text = eq.nome;
+                    selectEquip.appendChild(option);
                 });
-            </script>
-            <script>
-                function iniciarDitado(targetId) {
-                    if (!('webkitSpeechRecognition' in window)) {
-                        alert("Seu navegador não suporta reconhecimento de voz. Tente usar o Chrome no Android.");
-                        return;
-                    }
+            }
+            selectEquip.disabled = false;
+        } catch (error) {
+            console.error(error);
+            selectEquip.innerHTML = '<option>Erro ao carregar.</option>';
+        }
+    }
 
-                    const recognition = new webkitSpeechRecognition();
-                    recognition.lang = 'pt-BR';
-                    recognition.interimResults = false;
-                    recognition.maxAlternatives = 1;
+    // Preview de Fotos
+    document.getElementById('inputFotos').addEventListener('change', function (e) {
+        const container = document.getElementById('previewFotos');
+        container.innerHTML = '';
+        for (let file of this.files) {
+            let reader = new FileReader();
+            reader.onload = function (event) {
+                let img = document.createElement('img');
+                img.src = event.target.result;
+                img.className = 'rounded border shadow-sm';
+                img.style.height = '80px';
+                img.style.width = '80px';
+                img.style.objectFit = 'cover';
+                container.appendChild(img);
+            }
+            reader.readAsDataURL(file);
+        }
+    });
 
-                    const statusElem = document.getElementById('micStatus');
-                    const inputElem = document.getElementById(targetId);
+    // Reconhecimento de Voz (UI Feedback melhorado)
+    function iniciarDitado(targetId) {
+        if (!('webkitSpeechRecognition' in window)) {
+            ToastModule.show("Seu navegador não suporta ditado.", "warning");
+            return;
+        }
+        const recognition = new webkitSpeechRecognition();
+        recognition.lang = 'pt-BR';
 
-                    recognition.start();
+        const statusElem = document.getElementById('micStatus');
+        const micText = document.getElementById('micText');
+        const inputElem = document.getElementById(targetId);
 
-                    recognition.onstart = function () {
-                        statusElem.style.display = 'block';
-                        statusElem.innerText = "Ouvindo... Pode falar.";
-                        statusElem.className = "text-primary fw-bold";
-                    };
+        recognition.onstart = function () {
+            statusElem.classList.remove('d-none');
+            micText.innerText = "Parar";
+        };
 
-                    recognition.onresult = function (event) {
-                        const transcript = event.results[0][0].transcript;
-                        // Adiciona o texto ao que já existe
-                        const atual = inputElem.value;
-                        inputElem.value = atual ? atual + " " + transcript : transcript;
-                    };
+        recognition.onend = function () {
+            statusElem.classList.add('d-none');
+            micText.innerText = "Ditar Texto";
+        };
 
-                    recognition.onerror = function (event) {
-                        statusElem.innerText = "Erro no reconhecimento: " + event.error;
-                        statusElem.className = "text-danger";
-                    };
+        recognition.onresult = function (event) {
+            const transcript = event.results[0][0].transcript;
+            const atual = inputElem.value;
+            inputElem.value = atual ? atual + " " + transcript : transcript;
+        };
 
-                    recognition.onend = function () {
-                        setTimeout(() => { statusElem.style.display = 'none'; }, 2000);
-                    };
-                }
-            </script>
-            {% endblock %}
+        recognition.start();
+    }
+</script>
+
+<style>
+    .blink {
+        animation: blinker 1.5s linear infinite;
+    }
+
+    @keyframes blinker {
+        50% {
+            opacity: 0;
+        }
+    }
+</style>
+{% endblock %}

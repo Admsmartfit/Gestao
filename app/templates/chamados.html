@@ -1,25 +1,23 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row mb-4 align-items-end">
-    <div class="col">
-        <h2 class="fw-bold mb-1">Tarefas Externas</h2>
-        <p class="text-muted mb-0">Gestão de serviços terceirizados e chamados.</p>
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h2 class="mb-1">Tarefas Externas</h2>
+        <p class="mb-0">Serviços terceirizados e manutenção.</p>
     </div>
-    <div class="col-auto">
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoChamado">
-            <i class="bi bi-plus-lg me-2"></i> Criar Tarefa
-        </button>
-    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoChamado">
+        <i class="bi bi-plus-lg"></i> Nova Tarefa
+    </button>
 </div>
 
-<div class="card border-0">
+<div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead>
+            <table class="table table-hover table-responsive-stack mb-0">
+                <thead class="bg-light">
                     <tr>
-                        <th class="ps-4">Tarefa / Chamado</th>
+                        <th class="ps-4">Tarefa</th>
                         <th>Prestador</th>
                         <th>Prazo</th>
                         <th>Status</th>
@@ -29,55 +27,67 @@
                 <tbody>
                     {% for c in chamados %}
                     <tr>
-                        <td class="ps-4">
-                            <div class="fw-bold">{{ c.titulo }}</div>
-                            <small class="text-muted font-monospace">{{ c.numero_chamado }}</small>
+                        <td class="ps-4" data-label="Tarefa">
+                            <div class="fw-bold text-dark">{{ c.titulo }}</div>
+                            <small class="text-muted">{{ c.numero_chamado }}</small>
                         </td>
-                        <td>
+                        <td data-label="Prestador">
                             <div class="d-flex align-items-center">
-                                <div class="avatar-circle bg-light text-primary me-2 rounded-circle d-flex align-items-center justify-content-center"
+                                <div class="avatar-circle bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-2"
                                     style="width: 32px; height: 32px;">
-                                    <i class="bi bi-person-fill"></i>
+                                    <i class="bi bi-person-fill small"></i>
                                 </div>
                                 <div>
-                                    <div class="fw-500">{{ c.terceirizado.nome }}</div>
-                                    <small class="text-muted" style="font-size: 0.75rem;">{{ c.terceirizado.telefone
-                                        }}</small>
+                                    <div class="fw-medium text-dark">{{ c.terceirizado.nome }}</div>
+                                    <a href="tel:{{ c.terceirizado.telefone }}"
+                                        class="text-decoration-none text-muted small hover-primary">
+                                        {{ c.terceirizado.telefone }}
+                                    </a>
                                 </div>
                             </div>
                         </td>
-                        <td>
+                        <td data-label="Prazo">
                             {% if c.prazo_combinado %}
                             {% if c.prazo_combinado < hoje and c.status !='concluido' %} <span
-                                class="text-danger fw-bold"><i class="bi bi-exclamation-circle"></i> {{
-                                c.prazo_combinado.strftime('%d/%m') }}</span>
+                                class="text-danger fw-bold d-flex align-items-center gap-1">
+                                <i class="bi bi-exclamation-circle-fill"></i>
+                                {{ c.prazo_combinado.strftime('%d/%m') }}
+                                </span>
                                 {% else %}
-                                {{ c.prazo_combinado.strftime('%d/%m %H:%M') }}
+                                <span class="text-muted">
+                                    {{ c.prazo_combinado.strftime('%d/%m %H:%M') }}
+                                </span>
                                 {% endif %}
                                 {% else %}
                                 -
                                 {% endif %}
                         </td>
-                        <td>
+                        <td data-label="Status">
                             {% if c.status == 'concluido' %}
-                            <span class="badge bg-success">Concluído</span>
-                            {% elif c.prazo_combinado < hoje %} <span class="badge bg-danger">Atrasado</span>
+                            <span class="badge bg-success bg-opacity-10 text-success">Concluído</span>
+                            {% elif c.prazo_combinado < hoje %} <span class="badge bg-danger bg-opacity-10 text-danger">
+                                Atrasado</span>
                                 {% else %}
-                                <span class="badge bg-info">Em Andamento</span>
+                                <span class="badge bg-info bg-opacity-10 text-info">Em Andamento</span>
                                 {% endif %}
                         </td>
-                        <td class="text-end pe-4">
+                        <td class="text-end pe-4" data-label="Ações">
                             {% if c.prazo_combinado and c.prazo_combinado < hoje and c.status !='concluido' %} <button
-                                onclick="cobrar('{{ c.id }}')" class="btn btn-sm btn-outline-danger"
+                                onclick="cobrar('{{ c.id }}', this)" class="btn btn-sm btn-outline-danger w-100-mobile"
                                 title="Cobrar via WhatsApp">
-                                <i class="bi bi-whatsapp"></i>
+                                <i class="bi bi-whatsapp me-1"></i> Cobrar
                                 </button>
                                 {% endif %}
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center py-5 text-muted">Nenhuma tarefa externa registrada.</td>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="text-muted opacity-50">
+                                <i class="bi bi-clipboard-check fs-1 d-block mb-2"></i>
+                                Nenhuma tarefa registrada.
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -88,14 +98,15 @@
 
 <div class="modal fade" id="modalNovoChamado" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content border-0 shadow" action="{{ url_for('terceirizados.criar_chamado') }}" method="POST">
+        <form class="modal-content border-0 shadow-lg" action="{{ url_for('terceirizados.criar_chamado') }}"
+            method="POST">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold">Nova Tarefa Externa</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label text-muted small fw-bold text-uppercase">Prestador</label>
+                    <label class="form-label">Prestador</label>
                     <select name="terceirizado_id" class="form-select" required>
                         <option value="" disabled selected>Selecione...</option>
                         {% for t in terceirizados %}
@@ -104,21 +115,21 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label text-muted small fw-bold text-uppercase">Título</label>
+                    <label class="form-label">Título</label>
                     <input type="text" name="titulo" class="form-control" placeholder="Ex: Manutenção Ar Condicionado"
                         required>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label text-muted small fw-bold text-uppercase">Descrição</label>
+                    <label class="form-label">Descrição</label>
                     <textarea name="descricao" class="form-control" rows="3"></textarea>
                 </div>
-                <div class="row">
+                <div class="row g-3">
                     <div class="col-6">
-                        <label class="form-label text-muted small fw-bold text-uppercase">Prazo</label>
+                        <label class="form-label">Prazo</label>
                         <input type="datetime-local" name="prazo" class="form-control" required>
                     </div>
                     <div class="col-6">
-                        <label class="form-label text-muted small fw-bold text-uppercase">Prioridade</label>
+                        <label class="form-label">Prioridade</label>
                         <select name="prioridade" class="form-select">
                             <option value="media">Média</option>
                             <option value="alta">Alta</option>
@@ -128,7 +139,7 @@
                 </div>
             </div>
             <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="submit" class="btn btn-primary px-4">Criar Tarefa</button>
             </div>
         </form>
@@ -136,12 +147,23 @@
 </div>
 
 <script>
-    function cobrar(id) {
+    function cobrar(id, btn) {
         if (confirm("Enviar cobrança automática via WhatsApp?")) {
+            // Loading state no botão específico
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Enviando...';
+
             fetch(`/terceirizados/chamados/${id}/cobrar`, { method: 'POST' })
                 .then(res => res.json())
-                .then(data => alert(data.msg))
-                .catch(err => alert("Erro ao conectar com API."));
+                .then(data => {
+                    ToastModule.show(data.msg, data.success ? 'success' : 'danger');
+                })
+                .catch(err => ToastModule.show("Erro de conexão.", 'danger'))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                });
         }
     }
 </script>

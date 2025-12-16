@@ -6,66 +6,79 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
     <div>
-        <h2 class="fw-bold mb-1">Controle de Estoque</h2>
-        <p class="text-muted mb-0">Gerenciamento de peças e insumos.</p>
+        <h2 class="mb-1">Estoque</h2>
+        <p class="mb-0">Gerenciamento de peças e insumos.</p>
     </div>
     {% if current_user.tipo in ['admin', 'gerente'] %}
     <a href="{{ url_for('admin.dashboard', tab='fornecedores') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-2"></i> Novo Item
+        <i class="bi bi-plus-lg"></i> Novo Item
     </a>
     {% endif %}
 </div>
 
-<div class="card border-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead>
-                <tr>
-                    <th class="ps-4">Item</th>
-                    <th>Categoria</th>
-                    <th>Saldo</th>
-                    <th>Valor Unit.</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in estoque %}
-                <tr>
-                    <td class="ps-4">
-                        <div class="fw-bold text-dark">{{ item.nome }}</div>
-                        <small class="text-muted font-monospace">{{ item.codigo }}</small>
-                    </td>
-                    <td>
-                        <span
-                            class="badge bg-secondary text-dark bg-opacity-10 border border-secondary border-opacity-10">
-                            {{ item.categoria.nome if item.categoria else 'Geral' }}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="fw-bold">{{ item.quantidade_atual | round(2) }}</span>
-                        <small class="text-muted">{{ item.unidade_medida }}</small>
-                    </td>
-                    <td>R$ {{ item.valor_unitario }}</td>
-                    <td>
-                        {% if item.quantidade_atual <= item.quantidade_minima %} <span class="badge bg-danger">
-                            <i class="bi bi-arrow-down"></i> Baixo
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-responsive-stack mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Item / Código</th>
+                        <th>Categoria</th>
+                        <th>Saldo</th>
+                        <th>Valor Unit.</th>
+                        <th class="text-end pe-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in estoque %}
+                    <tr>
+                        <td class="ps-4" data-label="Item">
+                            <div class="fw-bold text-dark">{{ item.nome }}</div>
+                            <small class="text-muted font-monospace bg-light px-2 py-1 rounded border">{{ item.codigo
+                                }}</small>
+                        </td>
+                        <td data-label="Categoria">
+                            <span
+                                class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10">
+                                {{ item.categoria.nome if item.categoria else 'Geral' }}
                             </span>
-                            {% else %}
-                            <span class="badge bg-success">
-                                <i class="bi bi-check"></i> Normal
-                            </span>
-                            {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" class="text-center py-5 text-muted">Estoque vazio.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        </td>
+                        <td data-label="Saldo">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual) }}</span>
+                                <span class="text-muted small">{{ item.unidade_medida }}</span>
+                            </div>
+                        </td>
+                        <td data-label="Valor Unit.">
+                            <span class="text-muted">R$ {{ "{:.2f}".format(item.valor_unitario) }}</span>
+                        </td>
+                        <td class="text-end pe-4" data-label="Status">
+                            {% if item.quantidade_atual <= item.quantidade_minima %} <span
+                                class="badge bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-arrow-down-short"></i> Baixo
+                                </span>
+                                {% else %}
+                                <span class="badge bg-success bg-opacity-10 text-success">
+                                    <i class="bi bi-check2"></i> Normal
+                                </span>
+                                {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="text-muted opacity-50">
+                                <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
+                                Nenhum item no estoque.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
