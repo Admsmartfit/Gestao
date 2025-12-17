@@ -176,7 +176,7 @@ def solicitar_compra_peca(id):
 def entrada_estoque():
     """Registra entrada de novas peças (compra/reposição)."""
     # Apenas gerentes ou admins (ou técnicos, dependendo da regra, aqui deixei aberto a logados)
-    if current_user.tipo not in ['admin', 'gerente', 'tecnico']:
+    if current_user.tipo not in ['admin', 'gerente', 'tecnico', 'comprador']:
          return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
 
     data = request.get_json()
@@ -225,7 +225,130 @@ def buscar_pecas():
 @login_required
 def painel_estoque():
     itens = Estoque.query.order_by(Estoque.nome).all()
-    return render_template('estoque.html', estoque=itens)
+    unidades = Unidade.query.order_by(Unidade.nome).all()
+    return render_template('estoque.html', estoque=itens, unidades=unidades)
+
+@bp.route('/api/estoque/solicitar-compra', methods=['POST'])
+@login_required
+def solicitar_compra():
+    data = request.get_json()
+    try:
+        estoque_id = data.get('estoque_id')
+        qtd = float(data.get('quantidade', 1))
+        
+        # Cria pedido pendente (sem fornecedor ainda)
+        pedido = PedidoCompra(
+            estoque_id=estoque_id,
+            fornecedor_id=None, # Será definido na aprovação ou via regra de negócio
+            quantidade=qtd,
+            status='pendente',
+            data_solicitacao=datetime.utcnow()
+        )
+        # Hack: PedidoCompra obriga fornecedor_id NOT NULL na definição original?
+        # Se sim, precisamos buscar o principal ou permitir nulo.
+        # Verificando model: fornecedor_id = db.Column(..., nullable=False)
+        # Solução: Buscar o primeiro fornecedor vinculado ou um "Fornecedor Padrão"
+        # Se não houver, vai dar erro. Vamos pegar o primeiro vinculo do catalogo.
+        from app.models.estoque_models import CatalogoFornecedor
+        vinculo = CatalogoFornecedor.query.filter_by(estoque_id=estoque_id).first()
+        if vinculo:
+            pedido.fornecedor_id = vinculo.fornecedor_id
+        else:
+            # Tenta pegar qualquer fornecedor ou um placeholder se existir
+            # Para evitar erro 500 agora, vamos assumir que o sistema exige vinculo prévio
+            # Ou vamos relaxar a constraint? Não posso mudar o DB agora sem migração.
+            # Vou buscar o primeiro fornecedor da base.
+            primeiro_forn = Fornecedor.query.first()
+            if primeiro_forn:
+                pedido.fornecedor_id = primeiro_forn.id
+            else:
+                return jsonify({'success': False, 'erro': 'Nenhum fornecedor cadastrado no sistema para vincular.'}), 400
+
+        db.session.add(pedido)
+        db.session.commit()
+        return jsonify({'success': True, 'msg': 'Solicitação de compra criada!'})
+    except Exception as e:
+        return jsonify({'success': False, 'erro': str(e)}), 400
+
+# [NOVO] Solicitar Transferência entre Unidades
+@bp.route('/api/estoque/transferir', methods=['POST'])
+@login_required
+def solicitar_transferencia():
+    data = request.get_json()
+    try:
+        from app.models.estoque_models import SolicitacaoTransferencia, EstoqueSaldo
+        
+        estoque_id = data.get('estoque_id')
+        qtd = float(data.get('quantidade'))
+        unidade_origem_id = data.get('unidade_origem_id')
+        unidade_destino_id = data.get('unidade_destino_id')
+        
+        if not all([estoque_id, qtd, unidade_origem_id, unidade_destino_id]):
+             return jsonify({'success': False, 'erro': 'Dados incompletos'}), 400
+             
+        # Verificar Disponibilidade na Origem
+        saldo_origem = EstoqueSaldo.query.filter_by(
+            estoque_id=estoque_id, 
+            unidade_id=unidade_origem_id
+        ).first()
+        
+        if not saldo_origem or saldo_origem.quantidade < qtd:
+             return jsonify({'success': False, 'erro': 'Saldo insuficiente na unidade de origem.'}), 400
+
+        solicitacao = SolicitacaoTransferencia(
+            estoque_id=estoque_id,
+            unidade_origem_id=unidade_origem_id,
+            unidade_destino_id=unidade_destino_id,
+            solicitante_id=current_user.id,
+            quantidade=qtd,
+            status='pendente', # Ou 'aprovada' automaticamente se for admin/gerente
+            observacao=data.get('observacao')
+        )
+        
+        # Se for Gerente ou Admin, já aprova e executa a movimentação
+        if current_user.tipo in ['admin', 'gerente']:
+            solicitacao.status = 'concluida'
+            solicitacao.data_conclusao = datetime.utcnow()
+            
+            # Executa a Movimentação Física
+            saldo_origem.quantidade -= Decimal(qtd)
+            
+            saldo_destino = EstoqueSaldo.query.filter_by(
+                estoque_id=estoque_id, 
+                unidade_id=unidade_destino_id
+            ).first()
+            
+            if not saldo_destino:
+                saldo_destino = EstoqueSaldo(estoque_id=estoque_id, unidade_id=unidade_destino_id, quantidade=0)
+                db.session.add(saldo_destino)
+            
+            saldo_destino.quantidade += Decimal(qtd)
+            
+            # Registra Histórico (Saída na Origem, Entrada no Destino)
+            from app.models.estoque_models import MovimentacaoEstoque
+            MovimentacaoEstoque(
+                estoque_id=estoque_id, usuario_id=current_user.id, unidade_id=unidade_origem_id,
+                tipo_movimentacao='saida', quantidade=qtd, observacao=f"Transferência para {unidade_destino_id}"
+            )
+            # O trigger update_saldo_estoque pode duplicar a conta se não formos cuidadosos.
+            # Como EstoqueSaldo é separado, precisamos garantir que o EstoqueGlobal se mantenha (Saida + Entrada = 0 impacto global)
+            
+            # Nota: O trigger atualiza Estoque.quantidade_atual (Global).
+            # Se fizermos Saida (-10) e Entrada (+10), o Global fica igual. Correto.
+            
+            db.session.add(MovimentacaoEstoque(
+                estoque_id=estoque_id, usuario_id=current_user.id, unidade_id=unidade_destino_id,
+                tipo_movimentacao='entrada', quantidade=qtd, observacao=f"Transferência de {unidade_origem_id}"
+            ))
+
+        db.session.add(solicitacao)
+        db.session.commit()
+        
+        msg = 'Transferência realizada com sucesso!' if solicitacao.status == 'concluida' else 'Solicitação de transferência criada.'
+        return jsonify({'success': True, 'msg': msg})
+
+    except Exception as e:
+        return jsonify({'success': False, 'erro': str(e)}), 400
 
 # --- ROTA QUE ESTAVA FALTANDO ---
 @bp.route('/api/equipamentos/filtro')

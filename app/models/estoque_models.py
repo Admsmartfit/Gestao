@@ -105,19 +105,7 @@ class PlanoManutencao(db.Model):
 
     equipamento = db.relationship('Equipamento', backref='planos')
 
-class MovimentacaoEstoque(db.Model):
-    __tablename__ = 'movimentacoes_estoque'
-    id = db.Column(db.Integer, primary_key=True)
-    os_id = db.Column(db.Integer, db.ForeignKey('ordens_servico.id'), nullable=True)
-    estoque_id = db.Column(db.Integer, db.ForeignKey('estoque.id'), nullable=False)
-    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
-    tipo_movimentacao = db.Column(db.String(20), nullable=False)
-    quantidade = db.Column(db.Numeric(10, 3), nullable=False)
-    observacao = db.Column(db.String(255), nullable=True)
-    data_movimentacao = db.Column(db.DateTime, default=datetime.utcnow)
 
-    estoque = db.relationship('Estoque', backref='historico')
-    usuario = db.relationship('Usuario')
 
 class Fornecedor(db.Model):
     __tablename__ = 'fornecedores'
@@ -141,6 +129,42 @@ class CatalogoFornecedor(db.Model):
     fornecedor = db.relationship('Fornecedor', backref='catalogo')
     peca = db.relationship('Estoque', backref='fornecedores')
 
+# [NOVO] Saldo por Unidade
+class EstoqueSaldo(db.Model):
+    __tablename__ = 'estoque_saldo'
+    id = db.Column(db.Integer, primary_key=True)
+    estoque_id = db.Column(db.Integer, db.ForeignKey('estoque.id'), nullable=False)
+    unidade_id = db.Column(db.Integer, db.ForeignKey('unidades.id'), nullable=False)
+    quantidade = db.Column(db.Numeric(10, 3), nullable=False, default=0)
+    localizacao = db.Column(db.String(100), nullable=True) # Prateleira X, Gaveta Y
+
+    peca = db.relationship('Estoque', backref='saldos')
+    unidade = db.relationship('Unidade', backref='estoque_saldos')
+
+    __table_args__ = (
+        db.UniqueConstraint('estoque_id', 'unidade_id', name='uq_estoque_unidade'),
+    )
+
+# [NOVO] Solicitação de Transferência
+class SolicitacaoTransferencia(db.Model):
+    __tablename__ = 'solicitacoes_transferencia'
+    id = db.Column(db.Integer, primary_key=True)
+    estoque_id = db.Column(db.Integer, db.ForeignKey('estoque.id'), nullable=False)
+    unidade_origem_id = db.Column(db.Integer, db.ForeignKey('unidades.id'), nullable=False)
+    unidade_destino_id = db.Column(db.Integer, db.ForeignKey('unidades.id'), nullable=False)
+    solicitante_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    quantidade = db.Column(db.Numeric(10, 3), nullable=False)
+    
+    status = db.Column(db.String(20), default='pendente') # pendente, aprovada, rejeitada, concluida
+    data_solicitacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_conclusao = db.Column(db.DateTime, nullable=True)
+    observacao = db.Column(db.String(255), nullable=True)
+
+    peca = db.relationship('Estoque')
+    origem = db.relationship('Unidade', foreign_keys=[unidade_origem_id])
+    destino = db.relationship('Unidade', foreign_keys=[unidade_destino_id])
+    solicitante = db.relationship('Usuario')
+
 class PedidoCompra(db.Model):
     __tablename__ = 'pedidos_compra'
     id = db.Column(db.Integer, primary_key=True)
@@ -152,6 +176,24 @@ class PedidoCompra(db.Model):
     status = db.Column(db.String(20), default='pendente')
     fornecedor = db.relationship('Fornecedor', backref='pedidos')
     peca = db.relationship('Estoque')
+
+class MovimentacaoEstoque(db.Model):
+    __tablename__ = 'movimentacoes_estoque'
+    id = db.Column(db.Integer, primary_key=True)
+    os_id = db.Column(db.Integer, db.ForeignKey('ordens_servico.id'), nullable=True)
+    estoque_id = db.Column(db.Integer, db.ForeignKey('estoque.id'), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    # [NOVO] Rastrear onde ocorreu
+    unidade_id = db.Column(db.Integer, db.ForeignKey('unidades.id'), nullable=True) 
+    
+    tipo_movimentacao = db.Column(db.String(20), nullable=False)
+    quantidade = db.Column(db.Numeric(10, 3), nullable=False)
+    observacao = db.Column(db.String(255), nullable=True)
+    data_movimentacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    estoque = db.relationship('Estoque', backref='historico')
+    usuario = db.relationship('Usuario')
+    unidade = db.relationship('Unidade')
 
 @event.listens_for(MovimentacaoEstoque, 'after_insert')
 def atualizar_saldo_estoque(mapper, connection, target):

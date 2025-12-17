@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h2 class="mb-1">Central de Compras</h2>
+        <p class="mb-0 text-muted">Aprovação e recebimento de pedidos.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('os.painel_estoque') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i> Estoque
+        </a>
+    </div>
+</div>
+
+<ul class="nav nav-tabs nav-fill mb-4 border-bottom-0" id="comprasTab" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link border-0 rounded-top active shadow-sm fw-bold bg-white" data-bs-toggle="tab"
+            data-bs-target="#pendentes">
+            <i class="bi bi-hourglass-split me-2 text-warning"></i> Pendentes
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link border-0 rounded-top" data-bs-toggle="tab" data-bs-target="#aguardando">
+            <i class="bi bi-truck me-2 text-primary"></i> A Receber
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link border-0 rounded-top" data-bs-toggle="tab" data-bs-target="#historico">
+            <i class="bi bi-check2-all me-2 text-success"></i> Histórico
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="comprasTabContent">
+    <!-- ABA PENDENTES -->
+    <div class="tab-pane fade show active" id="pendentes">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Item</th>
+                            <th>Qtd Solic.</th>
+                            <th>Data</th>
+                            <th>Status Estimado</th>
+                            <th class="text-end pe-4">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pendentes %}
+                        <tr>
+                            <td class="ps-4 fw-bold">
+                                {{ p.peca.nome }}
+                                <div class="small text-muted font-monospace">{{ p.peca.codigo }}</div>
+                            </td>
+                            <td>{{ "{:g}".format(p.quantidade) }} {{ p.peca.unidade_medida }}</td>
+                            <td>{{ p.data_solicitacao.strftime('%d/%m %H:%M') }}</td>
+                            <td>
+                                {% if p.peca.quantidade_atual <= p.peca.quantidade_minima %} <span
+                                    class="badge bg-danger bg-opacity-10 text-danger">Crítico</span>
+                                    {% else %}
+                                    <span class="badge bg-warning bg-opacity-10 text-warning">Reposição</span>
+                                    {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <button class="btn btn-sm btn-success" onclick="aprovarPedido('{{ p.id }}')">
+                                    <i class="bi bi-check-lg"></i> Aprovar
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="rejeitarPedido('{{ p.id }}')">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">Nenhum pedido pendente.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA A RECEBER (APROVADOS) -->
+    <div class="tab-pane fade" id="aguardando">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Pedido #</th>
+                            <th>Item</th>
+                            <th>Fornecedor</th>
+                            <th>Previsão</th>
+                            <th class="text-end pe-4">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in aprovados %}
+                        <tr>
+                            <td class="ps-4 text-muted">#{{ p.id }}</td>
+                            <td>{{ p.peca.nome }}</td>
+                            <td>{{ p.fornecedor.nome if p.fornecedor else 'A Definir' }}</td>
+                            <td>{{ p.data_chegada.strftime('%d/%m') if p.data_chegada else '-' }}</td>
+                            <td class="text-end pe-4">
+                                <button class="btn btn-sm btn-primary"
+                                    onclick="receberPedido('{{ p.id }}', '{{ p.peca.nome }}')">
+                                    <i class="bi bi-box-seam me-1"></i> Receber
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">Nenhum pedido aguardando entrega.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA HISTÓRICO -->
+    <div class="tab-pane fade" id="historico">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-archive fs-1 opacity-25"></i>
+                <p>Histórico de compras recentes aparecerá aqui.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Aprovar -->
+<div class="modal fade" id="modalAprovar" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aprovar Compra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Selecione o fornecedor para este pedido:</p>
+                <form id="formAprovar">
+                    <input type="hidden" id="idPedidoAprovar">
+                    <div class="mb-3">
+                        <label class="form-label">Fornecedor</label>
+                        <select id="selectFornecedor" class="form-select" required>
+                            {% for f in fornecedores %}
+                            <option value="{{ f.id }}">{{ f.nome }} (Prazo: {{ f.prazo_medio_entrega_dias|int }}d)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Previsão Chegada</label>
+                        <input type="date" id="dataChegada" class="form-control">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" onclick="confirmarAprovacao()">Confirmar Pedido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const modalAprovar = new bootstrap.Modal(document.getElementById('modalAprovar'));
+
+    function aprovarPedido(id) {
+        document.getElementById('idPedidoAprovar').value = id;
+        modalAprovar.show();
+    }
+
+    function confirmarAprovacao() {
+        const id = document.getElementById('idPedidoAprovar').value;
+        const fornId = document.getElementById('selectFornecedor').value;
+        const data = document.getElementById('dataChegada').value;
+
+        fetch(`/api/compras/${id}/aprovar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fornecedor_id: fornId, data_chegada: data })
+        }).then(res => res.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else ToastModule.show("Erro: " + data.erro, 'danger');
+            });
+    }
+
+    function receberPedido(id, nome) {
+        if (confirm(`Confirmar recebimento de ${nome}? Isso irá adicionar ao saldo do estoque.`)) {
+            fetch(`/api/compras/${id}/receber`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        ToastModule.show("Itens recebidos!", 'success');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        ToastModule.show("Erro: " + data.erro, 'danger');
+                    }
+                });
+        }
+    }
+
+    function rejeitarPedido(id) {
+        if (confirm("Deseja rejeitar este pedido?")) {
+            fetch(`/api/compras/${id}/rejeitar`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => location.reload());
+        }
+    }
+</script>
+{% endblock %}

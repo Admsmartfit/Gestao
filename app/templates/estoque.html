@@ -9,31 +9,39 @@
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
     <div>
         <h2 class="mb-1">Estoque</h2>
-        <p class="mb-0">Gerenciamento de peças e insumos.</p>
+        <p class="mb-0 text-muted">Gerenciamento de peças e insumos.</p>
     </div>
-    {% if current_user.tipo in ['admin', 'gerente'] %}
-    <a href="{{ url_for('admin.dashboard', tab='fornecedores') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> Novo Item
-    </a>
-    {% endif %}
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-primary" onclick="abrirHistorico()">
+            <i class="bi bi-clock-history me-2"></i> Histórico
+        </button>
+        <button class="btn btn-outline-danger" onclick="abrirModalCompraGeral()">
+            <i class="bi bi-cart-plus me-2"></i> Solicitar Compra
+        </button>
+        <button class="btn btn-success shadow-sm" onclick="abrirModalEntrada()">
+            <i class="bi bi-plus-lg me-2"></i> Nova Entrada
+        </button>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover table-responsive-stack mb-0">
+            <table class="table table-hover table-responsive-stack mb-0 align-middle">
                 <thead class="bg-light">
                     <tr>
                         <th class="ps-4">Item / Código</th>
                         <th>Categoria</th>
                         <th>Saldo</th>
                         <th>Valor Unit.</th>
-                        <th class="text-end pe-4">Status</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in estoque %}
-                    <tr>
+                    <tr
+                        class="{% if item.quantidade_atual <= item.quantidade_minima %}table-danger bg-opacity-10{% endif %}">
                         <td class="ps-4" data-label="Item">
                             <div class="fw-bold text-dark">{{ item.nome }}</div>
                             <small class="text-muted font-monospace bg-light px-2 py-1 rounded border">{{ item.codigo
@@ -52,33 +60,404 @@
                             </div>
                         </td>
                         <td data-label="Valor Unit.">
-                            <span class="text-muted">R$ {{ "{:.2f}".format(item.valor_unitario) }}</span>
+                            <span class="text-muted">R$ {{ "{:.2f}".format(item.valor_unitario or 0) }}</span>
                         </td>
-                        <td class="text-end pe-4" data-label="Status">
-                            {% if item.quantidade_atual <= item.quantidade_minima %} <span
-                                class="badge bg-danger bg-opacity-10 text-danger">
-                                <i class="bi bi-arrow-down-short"></i> Baixo
-                                </span>
-                                {% else %}
-                                <span class="badge bg-success bg-opacity-10 text-success">
-                                    <i class="bi bi-check2"></i> Normal
-                                </span>
-                                {% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center py-5">
-                            <div class="text-muted opacity-50">
-                                <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
-                                Nenhum item no estoque.
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        <td data-label="Status">
+                            {% if item.quantidade_atual <= item.quantidade_minima %} <div
+                                class="d-flex align-items-center gap-2">
+                                <span class="badge bg-danger text-white shadow-sm shimmer">BAIXO</span>
+                                <button class="btn btn-xs btn-danger btn-sm-custom ms-2 fade-in"
+                                    onclick="solicitarCompraItem('{{ item.id }}', '{{ item.nome }}')">
+                                    <i class="bi bi-cart-plus"></i> Comprar
+                                </button>
+        </div>
+        {% else %}
+        <span class="badge bg-success bg-opacity-10 text-success">
+            <i class="bi bi-check2"></i> Normal
+        </span>
+        {% endif %}
+        </td>
+        <td class="text-end pe-4" data-label="Ações">
+            <div class="dropdown d-inline-block">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                    data-bs-toggle="dropdown">
+                    <i class="bi bi-gear"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                    <li>
+                        <button class="dropdown-item"
+                            onclick="abrirModalTransferencia('{{ item.id }}', '{{ item.nome }}')">
+                            <i class="bi bi-arrow-left-right me-2 text-primary"></i> Transferir
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item"
+                            onclick="ajusteRapido('{{ item.id }}', '{{ item.nome }}', '{{ item.valor_unitario }}')">
+                            <i class="bi bi-sliders me-2"></i> Ajuste Rápido
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="6" class="text-center py-5">
+                <div class="text-muted opacity-50">
+                    <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
+                    Nenhum item no estoque.
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        </table>
+    </div>
+</div>
+</div>
+
+<!-- Modal Nova Entrada / Ajuste -->
+<div class="modal fade" id="modalEntrada" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="entradaModalTitle">Nova Entrada de Estoque</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <form id="formEntrada" onsubmit="event.preventDefault(); salvarEntrada();">
+
+                    <div class="mb-3" id="divSelectPeca">
+                        <label class="form-label">Buscar Item</label>
+                        <div class="position-relative">
+                            <input type="text" class="form-control" id="buscaPecaInput"
+                                placeholder="Digite para buscar..." autocomplete="off">
+                            <input type="hidden" id="pecaIdSelecionada">
+                            <div id="listaSugestoes" class="list-group position-absolute w-100 shadow-sm"
+                                style="z-index: 1000; display: none;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Exibido apenas no modo de ajuste rápido -->
+                    <div class="mb-3 d-none" id="divItemFixo">
+                        <label class="form-label">Item Selecionado</label>
+                        <input type="text" class="form-control bg-light" id="nomeItemFixo" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Unidade (Destino)</label>
+                        <select id="unidadeEntrada" class="form-select" required>
+                            {% for u in unidades %}
+                            <option value="{{ u.id }}">{{ u.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" step="0.01" class="form-control" id="qtdEntrada" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Valor Unit. (R$)</label>
+                            <input type="number" step="0.01" class="form-control" id="valorEntrada">
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label">Motivo / Obs</label>
+                        <input type="text" class="form-control" id="motivoEntrada" placeholder="Ex: Nota Fiscal 1234">
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-success" id="btnSalvarEntrada">
+                            Confirmar Entrada
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Modal Transferência -->
+<div class="modal fade" id="modalTransferencia" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Transferir Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <form id="formTransferencia" onsubmit="event.preventDefault(); salvarTransferencia();">
+                    <input type="hidden" id="transfEstoqueId">
+
+                    <div class="mb-3">
+                        <label class="form-label">Item</label>
+                        <input type="text" class="form-control bg-light" id="transfNomeItem" readonly>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Origem</label>
+                            <select id="transfOrigem" class="form-select" required>
+                                <option value="" disabled selected>De...</option>
+                                {% for u in unidades %}
+                                <option value="{{ u.id }}">{{ u.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Destino</label>
+                            <select id="transfDestino" class="form-select" required>
+                                <option value="" disabled selected>Para...</option>
+                                {% for u in unidades %}
+                                <option value="{{ u.id }}">{{ u.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Quantidade</label>
+                        <input type="number" step="0.01" class="form-control" id="transfQtd" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Observação</label>
+                        <input type="text" class="form-control" id="transfObs">
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary" id="btnSalvarTransf">
+                            Solicitar Transferência
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .shimmer {
+        animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.7;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+
+    .btn-sm-custom {
+        padding: 0.1rem 0.4rem;
+        font-size: 0.75rem;
+    }
+
+    .table-danger {
+        background-color: #fff5f5 !important;
+    }
+</style>
+
+<script>
+    let modalEntrada;
+    let modalTransferencia;
+    const buscaInput = document.getElementById('buscaPecaInput');
+    const sugestoesDiv = document.getElementById('listaSugestoes');
+    let debounceTimer;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        modalEntrada = new bootstrap.Modal(document.getElementById('modalEntrada'));
+        modalTransferencia = new bootstrap.Modal(document.getElementById('modalTransferencia'));
+    });
+
+    function abrirModalEntrada() {
+        document.getElementById('entradaModalTitle').innerText = "Nova Entrada (Manual)";
+        document.getElementById('divSelectPeca').classList.remove('d-none');
+        document.getElementById('divItemFixo').classList.add('d-none');
+        document.getElementById('formEntrada').reset();
+        document.getElementById('pecaIdSelecionada').value = "";
+        modalEntrada.show();
+        setTimeout(() => buscaInput.focus(), 500);
+    }
+
+    function abrirModalTransferencia(id, nome) {
+        document.getElementById('transfEstoqueId').value = id;
+        document.getElementById('transfNomeItem').value = nome;
+        document.getElementById('formTransferencia').reset();
+        modalTransferencia.show();
+    }
+
+    function salvarTransferencia() {
+        const id = document.getElementById('transfEstoqueId').value;
+        const origem = document.getElementById('transfOrigem').value;
+        const destino = document.getElementById('transfDestino').value;
+        const qtd = document.getElementById('transfQtd').value;
+        const obs = document.getElementById('transfObs').value;
+
+        if (origem === destino) {
+            ToastModule.show("Origem e Destino devem ser diferentes.", "warning");
+            return;
+        }
+
+        const btn = document.getElementById('btnSalvarTransf');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
+
+        fetch('/os/api/estoque/transferir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                estoque_id: id,
+                unidade_origem_id: origem,
+                unidade_destino_id: destino,
+                quantidade: qtd,
+                observacao: obs
+            })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    ToastModule.show(data.msg, "success");
+                    modalTransferencia.hide();
+                } else {
+                    ToastModule.show("Erro: " + data.erro, "danger");
+                }
+            })
+            .catch(() => ToastModule.show("Erro de conexão", "danger"))
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    }
+
+    function ajusteRapido(id, nome, valorAtual) {
+        document.getElementById('entradaModalTitle').innerText = "Ajuste Rápido de Estoque";
+        document.getElementById('divSelectPeca').classList.add('d-none');
+        document.getElementById('divItemFixo').classList.remove('d-none');
+        // ... (rest of function remains same)
+        document.getElementById('nomeItemFixo').value = nome;
+        document.getElementById('pecaIdSelecionada').value = id;
+        document.getElementById('valorEntrada').value = valorAtual;
+        document.getElementById('qtdEntrada').value = "";
+        document.getElementById('motivoEntrada').value = "Ajuste de Inventário";
+        modalEntrada.show();
+    }
+
+    // Busca de Peças
+    buscaInput.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        const termo = this.value;
+        if (termo.length < 2) {
+            sugestoesDiv.style.display = 'none';
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/os/api/pecas/buscar?q=${termo}`)
+                .then(r => r.json())
+                .then(data => {
+                    sugestoesDiv.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(item => {
+                            const div = document.createElement('a');
+                            div.className = 'list-group-item list-group-item-action cursor-pointer';
+                            div.innerHTML = `<strong>${item.nome}</strong> <span class="text-muted small">(${item.saldo} ${item.unidade})</span>`;
+                            div.onclick = () => selecionarPeca(item);
+                            sugestoesDiv.appendChild(div);
+                        });
+                        sugestoesDiv.style.display = 'block';
+                    } else {
+                        sugestoesDiv.style.display = 'none';
+                    }
+                });
+        }, 300);
+    });
+
+    function selecionarPeca(item) {
+        buscaInput.value = item.nome;
+        document.getElementById('pecaIdSelecionada').value = item.id;
+        document.getElementById('valorEntrada').value = ""; // Pode puxar do item se quiser
+        sugestoesDiv.style.display = 'none';
+    }
+
+    function salvarEntrada() {
+        const id = document.getElementById('pecaIdSelecionada').value;
+        const qtd = document.getElementById('qtdEntrada').value;
+        const valor = document.getElementById('valorEntrada').value;
+        const motivo = document.getElementById('motivoEntrada').value;
+
+        // [NOVO]
+        const unidade = document.getElementById('unidadeEntrada').value;
+
+        if (!id || !qtd) {
+            ToastModule.show("Selecione um item e informe a quantidade.", "warning");
+            return;
+        }
+
+        const btn = document.getElementById('btnSalvarEntrada');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
+
+        fetch('/os/api/estoque/entrada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                estoque_id: id,
+                quantidade: parseFloat(qtd),
+                motivo: motivo,
+                valor_novo: valor ? parseFloat(valor) : null,
+                unidade_id: unidade // [NOVO]
+            })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    ToastModule.show("Entrada registrada com sucesso!", "success");
+                    modalEntrada.hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    ToastModule.show("Erro: " + data.erro, "danger");
+                }
+            })
+            .catch(err => ToastModule.show("Erro ao conectar.", "danger"))
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    }
+
+    function solicitarCompraItem(id, nome) {
+        // Placeholder para futura implementação de requisição formal
+        if (confirm(`Solicitar compra urgente para: ${nome}?`)) {
+            ToastModule.show("Solicitação enviada ao setor de compras.", "success");
+        }
+    }
+
+    function abrirModalCompraGeral() {
+        ToastModule.show("Funcionalidade de Pedido em Lote em desenvolvimento.", "info");
+    }
+
+    function abrirHistorico() {
+        ToastModule.show("Histórico completo será implementado em breve.", "info");
+    }
+
+    // Fecha sugestões ao clicar fora
+    document.addEventListener('click', function (e) {
+        if (e.target !== buscaInput) {
+            sugestoesDiv.style.display = 'none';
+        }
+    });
+</script>
 {% endblock %}

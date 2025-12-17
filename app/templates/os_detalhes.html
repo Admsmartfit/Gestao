@@ -146,9 +146,9 @@
                                 <td data-label="Qtd">{{ "{:g}".format(mov.quantidade) }} {{ mov.estoque.unidade_medida
                                     }}</td>
                                 <td data-label="Unitário" class="text-muted">R$ {{
-                                    "{:.2f}".format(mov.estoque.valor_unitario) }}</td>
+                                    "{:.2f}".format(mov.estoque.valor_unitario or 0) }}</td>
                                 <td data-label="Subtotal" class="fw-bold text-dark">R$ {{ "{:.2f}".format(mov.quantidade
-                                    * mov.estoque.valor_unitario) }}</td>
+                                    * (mov.estoque.valor_unitario or 0)) }}</td>
                             </tr>
                             {% endif %}
                             {% endfor %}
@@ -235,6 +235,119 @@
                     <button type="submit" class="btn btn-success">Confirmar Conclusão</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Recursos (Peça ou Serviço) -->
+<div class="modal fade" id="modalRecursos" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Adicionar Recurso</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <ul class="nav nav-tabs nav-fill mb-4" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tabPeca">
+                            <i class="bi bi-box-seam me-2"></i> Peça / Material
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tabServico">
+                            <i class="bi bi-person-gear me-2"></i> Serviço Terceirizado
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- ABA PEÇA (JS Powered) -->
+                    <div class="tab-pane fade show active" id="tabPeca">
+                        <div class="mb-3 position-relative">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Buscar no Estoque</label>
+                            <input type="text" class="form-control form-control-lg" id="buscaPecaUnificada"
+                                placeholder="Digite o nome ou código..." autocomplete="off">
+                            <div id="listaSugestoesUnificada" class="list-group position-absolute w-100 shadow"
+                                style="z-index: 1050; top: 100%;"></div>
+                        </div>
+
+                        <!-- Card de Ação (Aparece após seleção) -->
+                        <div id="acaoPecaCard" class="card bg-light border-0 d-none">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <h5 class="fw-bold text-primary mb-1" id="nomePecaSelecionada">Nome da Peça</h5>
+                                        <span id="statusEstoqueBadge" class="badge bg-secondary">Status</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="small text-muted">Saldo Atual</div>
+                                        <div class="fs-5 fw-bold"><span id="saldoEstoqueValor">0</span> <span
+                                                id="unidadePeca" class="fs-6 text-muted">un</span></div>
+                                    </div>
+                                </div>
+
+                                <input type="hidden" id="idPecaSelecionada">
+
+                                <label class="form-label">Quantidade</label>
+                                <div class="d-flex gap-2">
+                                    <input type="number" id="qtdPecaAcao" class="form-control form-control-lg" value="1"
+                                        min="0.1" step="0.1">
+
+                                    <button onclick="salvarConsumoPeca()" id="btnConsumir"
+                                        class="btn btn-success flex-grow-1">
+                                        <i class="bi bi-box-arrow-down me-2"></i> Adicionar à OS
+                                    </button>
+
+                                    <button onclick="solicitarCompraPeca()" id="btnSolicitarCompra"
+                                        class="btn btn-danger flex-grow-1 d-none">
+                                        <i class="bi bi-cart-plus me-2"></i> Solicitar Compra
+                                    </button>
+                                </div>
+                                <div id="msgCompra" class="form-text text-danger mt-2 d-none">
+                                    <i class="bi bi-exclamation-triangle"></i> Item sem saldo suficiente. Será gerada
+                                    uma solicitação de compra.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ABA SERVIÇO (Form POST) -->
+                    <div class="tab-pane fade" id="tabServico">
+                        <form action="{{ url_for('os.adicionar_tarefa_externa', id=os.id) }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">Prestador de Serviço</label>
+                                <select name="terceirizado_id" class="form-select" required>
+                                    <option value="" disabled selected>Selecione...</option>
+                                    {% for terc in terceirizados %}
+                                    <option value="{{ terc.id }}">{{ terc.nome }} ({{ terc.especialidades or 'Geral' }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Descrição do Serviço</label>
+                                <input type="text" name="descricao" class="form-control" required
+                                    placeholder="Ex: Manutenção no motor...">
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label">Prazo Combinado</label>
+                                    <input type="datetime-local" name="prazo" class="form-control" required>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Valor Orçado (R$)</label>
+                                    <input type="number" name="valor" step="0.01" class="form-control"
+                                        placeholder="Opicional">
+                                </div>
+                            </div>
+                            <div class="d-grid mt-4">
+                                <button type="submit" class="btn btn-primary">Agendar Serviço</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

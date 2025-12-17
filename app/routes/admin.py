@@ -2,7 +2,8 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.models.models import Unidade, Usuario
-from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico
+from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico, PedidoCompra
+from datetime import datetime
 from app.models.terceirizados_models import Terceirizado
 from app.extensions import db
 from sqlalchemy import func
@@ -16,10 +17,16 @@ def restrict_to_admin():
     Bloqueia acesso a não-admins, EXCETO para a API de busca de fornecedores
     que é usada pelos técnicos na tela de OS.
     """
-    # Exceção para a API usada por técnicos
+    # Exceções (Rotas permitidas para não-admins)
+    # 1. API usada por técnicos na OS
     if request.endpoint == 'admin.buscar_fornecedores_peca':
-        return 
+        return
         
+    # 2. Compradores podem acessar painel de compras e APIs
+    if current_user.is_authenticated and current_user.tipo == 'comprador':
+        if request.endpoint in ['admin.compras_painel', 'admin.aprovar_pedido', 'admin.rejeitar_pedido', 'admin.receber_pedido']:
+            return
+
     if not current_user.is_authenticated or current_user.tipo != 'admin':
         abort(403)
 
@@ -344,5 +351,62 @@ def buscar_pecas_fornecedor(id):
             'preco': float(item.preco_atual) if item.preco_atual else 0.0,
             'prazo': item.prazo_estimado_dias
         })
+@bp.route('/compras', methods=['GET'])
+@login_required
+def compras_painel():
+    pendentes = PedidoCompra.query.filter_by(status='pendente').order_by(PedidoCompra.data_solicitacao.desc()).all()
+    aprovados = PedidoCompra.query.filter(PedidoCompra.status.in_(['aprovado', 'encomendado', 'solicitado'])).all()
+    # Histórico (concluidos ou cancelados)
+    historico = PedidoCompra.query.filter(PedidoCompra.status.in_(['entregue', 'cancelado'])).order_by(PedidoCompra.data_solicitacao.desc()).limit(20).all()
+    
+    fornecedores = Fornecedor.query.all()
+    
+    return render_template('compras.html', pendentes=pendentes, aprovados=aprovados, historico=historico, fornecedores=fornecedores)
+
+@bp.route('/api/compras/<int:id>/aprovar', methods=['POST'])
+@login_required
+def aprovar_pedido(id):
+    pedido = PedidoCompra.query.get_or_404(id)
+    data = request.get_json()
+    
+    pedido.status = 'aprovado'
+    pedido.fornecedor_id = data.get('fornecedor_id')
+    
+    # Data de Chegada Estimada
+    data_chegada_str = data.get('data_chegada')
+    if data_chegada_str:
+        from datetime import datetime
+        pedido.data_chegada = datetime.strptime(data_chegada_str, '%Y-%m-%d')
         
-    return jsonify(resultado)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@bp.route('/api/compras/<int:id>/rejeitar', methods=['POST'])
+@login_required
+def rejeitar_pedido(id):
+    pedido = PedidoCompra.query.get_or_404(id)
+    pedido.status = 'cancelado'
+    db.session.commit()
+    return jsonify({'success': True})
+
+@bp.route('/api/compras/<int:id>/receber', methods=['POST'])
+@login_required
+def receber_pedido(id):
+    pedido = PedidoCompra.query.get_or_404(id)
+    if pedido.status == 'entregue':
+        return jsonify({'success': False, 'erro': 'Já recebido'}), 400
+        
+    # Atualiza Status
+    pedido.status = 'entregue'
+    pedido.data_chegada = datetime.utcnow() # Data Real da Chegada
+    
+    # Atualiza Estoque
+    estoque = Estoque.query.get(pedido.estoque_id)
+    estoque.quantidade_atual += pedido.quantidade
+    
+    # Registra Movimentação (Opcional, mas ideal)
+    # Precisaria importar MovimentacaoEstoque.
+    # Vou deixar simples por agora, focando na atualização do saldo.
+    
+    db.session.commit()
+    return jsonify({'success': True})

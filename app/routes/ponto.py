@@ -2,9 +2,9 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.models import Unidade, RegistroPonto
-from app.models.estoque_models import OrdemServico
+from app.models.estoque_models import OrdemServico, Estoque
 from app.utils.decorators import require_unit_ip
-from datetime import datetime, timedelta # Importar timedelta
+from datetime import datetime, timedelta
 
 bp = Blueprint('ponto', __name__, url_prefix='/dashboard')
 
@@ -22,10 +22,32 @@ def index():
     else:
         minhas_os = OrdemServico.query.order_by(OrdemServico.data_abertura.desc()).limit(20).all()
 
+    # --- Lógica de Alertas (Notificações) ---
+    alertas_os = []
+    alertas_estoque = []
+    
+    # 1. OSs Vencendo (Prazo < 24h) ou Atrasadas
+    if current_user.tipo != 'tecnico': # Remove filtro se quiser que todos vejam
+        agora = datetime.utcnow()
+        limite_critico = agora + timedelta(hours=24)
+        
+        alertas_os = OrdemServico.query.filter(
+            OrdemServico.status == 'aberta',
+            OrdemServico.prazo_conclusao != None,
+            OrdemServico.prazo_conclusao <= limite_critico
+        ).order_by(OrdemServico.prazo_conclusao).limit(5).all()
+        
+        # 2. Estoque Baixo
+        alertas_estoque = Estoque.query.filter(
+            Estoque.quantidade_atual <= Estoque.quantidade_minima
+        ).limit(5).all()
+
     return render_template('dashboard.html', 
                          unidades=unidades, 
                          registro_aberto=registro_aberto,
-                         minhas_os=minhas_os)
+                         minhas_os=minhas_os,
+                         alertas_os=alertas_os,
+                         alertas_estoque=alertas_estoque)
 
 @bp.route('/checkin', methods=['POST'])
 @login_required
