@@ -32,17 +32,25 @@ class EstoqueService:
 
         # [NOVO] Validação de Saldo LOCAL (Unidade da OS)
         unidade_id = os_obj.unidade_id
-        saldo_local = EstoqueSaldo.query.filter_by(estoque_id=estoque_id, unidade_id=unidade_id).first()
+        saldo_local = EstoqueSaldo.query.filter_by(
+            estoque_id=estoque_id, 
+            unidade_id=unidade_id
+        ).first()
 
+        # ← CORREÇÃO: Tratar caso None
         qtd_disponivel_local = saldo_local.quantidade if saldo_local else Decimal(0)
 
-        # [RN004] Bloqueio por saldo insuficiente LOCAL
         if qtd_disponivel_local < qtd_decimal:
-            msg = f"Estoque insuficiente na unidade {os_obj.unidade.nome}. Disponível: {qtd_disponivel_local} {item.unidade_medida}"
-            # Opcional: Avisar se há em outras unidades
+            msg = f"Estoque insuficiente na unidade {os_obj.unidade.nome}. "
+            msg += f"Disponível: {qtd_disponivel_local} {item.unidade_medida}. "
+            
+            # Verifica se há em outras unidades
             total_global = item.quantidade_atual
             if total_global >= qtd_decimal:
-                msg += f" (Há saldo global: {total_global}, solicite transferência)."
+                msg += f"(Há {total_global} {item.unidade_medida} no estoque global. Solicite transferência ou entrada nesta unidade)."
+            else:
+                msg += "Solicite compra ou entrada de estoque."
+            
             raise ValueError(msg)
             
         # Atualizar Saldo Local
@@ -76,38 +84,41 @@ class EstoqueService:
     def repor_estoque(estoque_id, quantidade, usuario_id, motivo=None, unidade_id=None):
         """
         Registra entrada de material no estoque (Reabastecimento) em uma unidade específica.
+        Se o registro de saldo local (EstoqueSaldo) não existir, ele será criado.
         """
         item = Estoque.query.get(estoque_id)
         if not item:
             raise ValueError("Item não encontrado")
             
-        # Se não informou unidade, tenta pegar a do usuário logado (se técnico/gerente) ou erro
+        # Se não informou unidade, tenta pegar a do usuário logado (se técnico/gerente)
         if not unidade_id:
             usuario = Usuario.query.get(usuario_id)
             if usuario.unidade_padrao_id:
                 unidade_id = usuario.unidade_padrao_id
             else:
-                 # Se for admin global e não escolheu, precisa escolher.
-                 # Por fallback, vamos assumir a primeira unidade ativa ou erro.
-                 # Aqui vou lançar erro para forçar envio da unidade.
                  raise ValueError("É necessário informar a unidade para entrada de estoque.")
 
         qtd_decimal = Decimal(str(quantidade))
         if qtd_decimal <= 0:
             raise ValueError("A quantidade deve ser maior que zero.")
 
-        # Atualizar/Criar Saldo Local
+        # [CRÍTICO] Atualizar ou Criar Saldo Local (EstoqueSaldo)
+        # Verifica se já existe saldo deste item nesta unidade
         saldo_local = EstoqueSaldo.query.filter_by(estoque_id=estoque_id, unidade_id=unidade_id).first()
+        
         if not saldo_local:
+            # Se não existe, cria o registro inicial zerado para depois somar
             saldo_local = EstoqueSaldo(estoque_id=estoque_id, unidade_id=unidade_id, quantidade=0)
             db.session.add(saldo_local)
         
+        # Soma a quantidade entrada
         saldo_local.quantidade += qtd_decimal
 
+        # Registra a movimentação histórica
         mov = MovimentacaoEstoque(
             estoque_id=estoque_id,
             usuario_id=usuario_id,
-            unidade_id=unidade_id, # [NOVO]
+            unidade_id=unidade_id,
             tipo_movimentacao='entrada',
             quantidade=qtd_decimal,
             observacao=motivo or "Entrada manual de estoque"

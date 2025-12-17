@@ -55,7 +55,7 @@
                         </td>
                         <td data-label="Saldo">
                             <div class="d-flex align-items-center gap-2">
-                                <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual) }}</span>
+                                <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual|float) }}</span>
                                 <span class="text-muted small">{{ item.unidade_medida }}</span>
                             </div>
                         </td>

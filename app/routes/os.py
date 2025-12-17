@@ -69,6 +69,9 @@ def detalhes(id):
     terceirizados = Terceirizado.query.filter(
         (Terceirizado.unidade_id == None) | (Terceirizado.unidade_id == os_obj.unidade_id)
     ).filter_by(ativo=True).order_by(Terceirizado.nome).all()
+
+    if not terceirizados:
+        flash('Nenhum prestador cadastrado. Cadastre em Configurações primeiro.', 'warning')
     
     return render_template('os_detalhes.html', 
                          os=os_obj, 

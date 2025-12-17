@@ -351,6 +351,8 @@ def buscar_pecas_fornecedor(id):
             'preco': float(item.preco_atual) if item.preco_atual else 0.0,
             'prazo': item.prazo_estimado_dias
         })
+    
+    return jsonify(resultado)
 @bp.route('/compras', methods=['GET'])
 @login_required
 def compras_painel():
