@@ -449,20 +449,90 @@
     async function salvarConsumoPeca() {
         const id = idPecaField.value;
         const qtd = qtdField.value;
-        if (!id || !qtd) return;
 
-        const payload = { estoque_id: id, quantidade: qtd };
+        if (!id || !qtd) {
+            ToastModule.show("Selecione um item e informe a quantidade.", "warning");
+            return;
+        }
+
+        // Estado de carregamento no botão
+        const originalText = btnConsumir.innerHTML;
+        btnConsumir.disabled = true;
+        btnConsumir.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Processando...';
+
         try {
             const res = await fetch(`/os/{{ os.id }}/adicionar-peca`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ estoque_id: id, quantidade: qtd })
             });
             const data = await res.json();
-            if (data.success) location.reload();
-            else alert('Erro: ' + data.erro);
+
+            if (data.success) {
+                ToastModule.show(data.mensagem || "Peça adicionada com sucesso!", "success");
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                // 1. Detectar erro de "Estoque insuficiente"
+                if (data.erro && data.erro.toLowerCase().includes("insuficiente")) {
+
+                    // 2. Exibir Toast com botão de ação (HTML injetado)
+                    const actionBtn = `
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-light border shadow-sm text-primary fw-bold w-100" 
+                                    onclick="abrirModalEntradaContexto('${id}', '${nomePeca.innerText}')">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Solicitar Entrada
+                            </button>
+                        </div>`;
+
+                    ToastModule.show(`<div>${data.erro}</div>${actionBtn}`, 'warning');
+                } else {
+                    ToastModule.show("Erro: " + data.erro, 'danger');
+                }
+            }
         } catch (e) {
-            alert('Erro de conexão');
+            console.error(e);
+            ToastModule.show('Erro de conexão com o servidor.', 'danger');
+        } finally {
+            btnConsumir.disabled = false;
+            btnConsumir.innerHTML = originalText;
+        }
+    }
+
+    // 3. Função auxiliar para abrir o modal preenchido (Adicione esta função ao script)
+    function abrirModalEntradaContexto(id, nome) {
+        // Verifica se o modal existe na página (precisa ter sido incluído no template)
+        const modalEl = document.getElementById('modalEntrada');
+
+        if (modalEl && window.bootstrap) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            // Preenche os campos (compatível com a estrutura do estoque.html)
+            if (document.getElementById('entradaModalTitle'))
+                document.getElementById('entradaModalTitle').innerText = "Nova Entrada: " + nome;
+
+            if (document.getElementById('pecaIdSelecionada'))
+                document.getElementById('pecaIdSelecionada').value = id;
+
+            // Ajusta visualização para item fixo
+            if (document.getElementById('divSelectPeca'))
+                document.getElementById('divSelectPeca').classList.add('d-none');
+
+            if (document.getElementById('divItemFixo')) {
+                document.getElementById('divItemFixo').classList.remove('d-none');
+                document.getElementById('nomeItemFixo').value = nome;
+            }
+
+            // Reseta outros campos
+            if (document.getElementById('qtdEntrada')) document.getElementById('qtdEntrada').value = "";
+            if (document.getElementById('valorEntrada')) document.getElementById('valorEntrada').value = "";
+            if (document.getElementById('motivoEntrada')) document.getElementById('motivoEntrada').value = "Necessidade OS #{{ os.numero_os }}";
+
+            modal.show();
+        } else {
+            // Fallback se o modal não estiver presente na tela de detalhes
+            if (confirm(`O Modal de Entrada não está nesta página. Deseja ir ao Estoque para dar entrada em "${nome}"?`)) {
+                window.location.href = "{{ url_for('os.painel_estoque') }}";
+            }
         }
     }
 

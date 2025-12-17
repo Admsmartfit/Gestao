@@ -245,9 +245,12 @@ def vincular_peca_fornecedor():
     existe = CatalogoFornecedor.query.filter_by(fornecedor_id=fornecedor_id, estoque_id=estoque_id).first()
     
     if existe:
+        preco_antigo = existe.preco_atual if existe.preco_atual else 0.0
+        
         existe.preco_atual = preco
         existe.prazo_estimado_dias = prazo
-        msg = 'Vínculo atualizado com sucesso!'
+        
+        msg = f'Vínculo atualizado: Preço de R$ {preco_antigo:.2f} para R$ {preco:.2f}'
     else:
         vinculo = CatalogoFornecedor(
             fornecedor_id=fornecedor_id,
@@ -356,15 +359,23 @@ def buscar_pecas_fornecedor(id):
 @bp.route('/compras', methods=['GET'])
 @login_required
 def compras_painel():
+    # Carrega pedidos pendentes
     pendentes = PedidoCompra.query.filter_by(status='pendente').order_by(PedidoCompra.data_solicitacao.desc()).all()
+    
+    # Carrega pedidos aprovados/em andamento
     aprovados = PedidoCompra.query.filter(PedidoCompra.status.in_(['aprovado', 'encomendado', 'solicitado'])).all()
+    
     # Histórico (concluidos ou cancelados)
     historico = PedidoCompra.query.filter(PedidoCompra.status.in_(['entregue', 'cancelado'])).order_by(PedidoCompra.data_solicitacao.desc()).limit(20).all()
     
+    # CORREÇÃO: Carregar fornecedores sempre, pois o modal de aprovação no template precisa dessa lista
     fornecedores = Fornecedor.query.all()
     
-    return render_template('compras.html', pendentes=pendentes, aprovados=aprovados, historico=historico, fornecedores=fornecedores)
-
+    return render_template('compras.html', 
+                         pendentes=pendentes, 
+                         aprovados=aprovados, 
+                         historico=historico, 
+                         fornecedores=fornecedores)
 @bp.route('/api/compras/<int:id>/aprovar', methods=['POST'])
 @login_required
 def aprovar_pedido(id):
