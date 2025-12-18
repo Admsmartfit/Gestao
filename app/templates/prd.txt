@@ -1,0 +1,656 @@
+# PRD - Sistema GMM (Gestão Moderna de Manutenção)
+
+## Visão Geral do Sistema
+
+Sistema web integrado para gestão de manutenção, controle de ponto, estoque e serviços terceirizados em academias/unidades múltiplas.
+
+---
+
+## MÓDULO 1: Autenticação e Controle de Acesso
+
+### 1.1 Funcionalidades
+- Login com username/senha
+- Tipos de usuário: admin, tecnico, gerente, comprador, prestador
+- Controle de sessão com Flask-Login
+- Restrição de IP por unidade (decorators)
+- Último acesso registrado
+
+### 1.2 Regras de Negócio
+- RN001: Admin acessa todas as funcionalidades
+- RN002: Técnicos acessam apenas suas OS e estoque
+- RN003: Compradores acessam apenas painel de compras
+- RN004: Check-in só permitido em IPs autorizados da unidade
+
+### 1.3 Endpoints
+```
+GET  /auth/login
+POST /auth/login
+GET  /auth/logout
+```
+
+---
+
+## MÓDULO 2: Gestão de Ordens de Serviço (OS)
+
+### 2.1 Funcionalidades Core
+- Criação de OS com fotos (antes/depois)
+- Vinculação a equipamentos e unidades
+- Rastreamento de peças consumidas
+- Cálculo automático de custos
+- Adição de serviços terceirizados
+- Conclusão com solução documentada
+
+### 2.2 Regras de Negócio
+- RN005: Número OS no formato `OS-{ANO}-{SEQUENCIAL}`
+- RN006: Máximo 10 fotos por upload (5MB cada)
+- RN007: Não adicionar peças em OS concluída/cancelada
+- RN008: Estoque descontado automaticamente no consumo
+- RN009: Alerta se prazo vence em <24h
+
+### 2.3 Endpoints
+```
+GET  /os/nova
+POST /os/nova
+GET  /os/<id>
+POST /os/<id>/concluir
+POST /os/<id>/adicionar-peca
+POST /os/<id>/adicionar-tarefa-externa
+POST /os/<id>/editar
+GET  /os/api/equipamentos/filtro
+```
+
+### 2.4 Integrações
+- Estoque (consumo de peças)
+- Terceirizados (chamados externos)
+- Notificações (alertas de prazo)
+
+---
+
+## MÓDULO 3: Gestão de Estoque ⭐ (FOCO DESTE PRD)
+
+### 3.1 Visão Geral
+Sistema multi-unidade com controle descentralizado, solicitações de compra e aprovação centralizada.
+
+### 3.2 Funcionalidades Principais
+
+#### 3.2.1 Controle de Saldo por Unidade
+**Objetivo**: Rastrear estoque físico em cada local
+
+**Tabela**: `estoque_saldo`
+- `estoque_id` (FK)
+- `unidade_id` (FK)
+- `quantidade` (Decimal)
+- `localizacao` (texto) - Ex: "Prateleira A3"
+
+**Regras**:
+- RN010: Cada item pode ter saldo em múltiplas unidades
+- RN011: Consumo desconta do saldo local da unidade da OS
+- RN012: `Estoque.quantidade_atual` = soma de todos os saldos
+- RN013: Alerta quando `quantidade_atual <= quantidade_minima`
+
+#### 3.2.2 Transferência Entre Unidades
+**Objetivo**: Permitir movimentação física de peças entre locais
+
+**Tabela**: `solicitacoes_transferencia`
+- `estoque_id` (FK)
+- `unidade_origem_id` (FK)
+- `unidade_destino_id` (FK)
+- `solicitante_id` (FKUsuário)
+- `quantidade` (Decimal)
+- `status` (pendente | aprovada | rejeitada | concluida)
+- `data_solicitacao` (DateTime)
+- `data_conclusao` (DateTime, nullable)
+- `observacao` (String 255)
+
+**Fluxos**:
+
+**Fluxo A - Técnico Solicita**:
+1. Técnico em Unidade B precisa de item com saldo 0 local
+2. Verifica que Unidade A tem saldo disponível
+3. Clica "Transferir" no painel de estoque
+4. Preenche origem, destino, quantidade
+5. Sistema cria registro com `status='pendente'`
+6. Gerente/Admin recebe notificação (futuro)
+7. Gerente aprova → status='aprovada' → executa movimentação física
+8. Sistema registra:
+   - Saída em `movimentacoes_estoque` (origem, tipo='saida')
+   - Entrada em `movimentacoes_estoque` (destino, tipo='entrada')
+   - Atualiza `estoque_saldo` de ambas unidades
+
+**Fluxo B - Admin/Gerente Executa Direto**:
+1. Admin clica "Transferir"
+2. Seleciona origem/destino/qtd
+3. Sistema valida saldo origem
+4. Executa transferência imediatamente (`aprovacao_automatica=True`)
+5. Status já vai para 'concluida'
+
+**Regras**:
+- RN014: Origem e destino devem ser diferentes
+- RN015: Validar saldo disponível na origem antes de aprovar
+- RN016: Admin/Gerente podem aprovar ou executar direto
+
+**Endpoint**:
+```python
+POST /os/api/estoque/transferir
+Body: {
+  estoque_id: int,
+  unidade_origem_id: int,
+  unidade_destino_id: int,
+  quantidade: float,
+  observacao?: string
+}
+Response: {
+  success: bool,
+  msg: string
+}
+```
+
+#### 3.2.3 Entrada de Estoque (Recebimento)
+**Objetivo**: Registrar chegada de novas peças (compras, doações, devoluções)
+
+**Funcionalidade**:
+- Botão "Nova Entrada" no painel de estoque
+- Modal com:
+  - Busca de peça (autocomplete)
+  - Seleção de unidade destino
+  - Quantidade
+  - Valor unitário (opcional, atualiza `Estoque.valor_unitario`)
+  - Motivo/Observação (Ex: "NF 12345")
+
+**Fluxo**:
+1. Usuário clica "Nova Entrada"
+2. Busca item pelo nome/código
+3. Seleciona unidade onde material chegou
+4. Informa quantidade e valor
+5. Sistema:
+   - Cria/Atualiza registro em `estoque_saldo`
+   - Incrementa `quantidade` do saldo local
+   - Registra `MovimentacaoEstoque` (tipo='entrada')
+   - Atualiza `quantidade_atual` global (trigger automático)
+
+**Regras**:
+- RN017: Entrada sempre vinculada a uma unidade específica
+- RN018: Se unidade não informada, usa `usuario.unidade_padrao_id`
+- RN019: Valor unitário opcional (mas recomendado)
+
+**Endpoint**:
+```python
+POST /os/api/estoque/entrada
+Body: {
+  estoque_id: int,
+  unidade_id: int,
+  quantidade: float,
+  motivo?: string,
+  valor_novo?: float
+}
+Response: {
+  success: bool,
+  novo_saldo: float
+}
+```
+
+#### 3.2.4 Solicitação de Compra ⭐ (NOVA FUNCIONALIDADE)
+**Objetivo**: Técnicos podem solicitar compra de itens sem saldo
+
+**Quando Usar**:
+- Item não tem saldo suficiente em nenhuma unidade
+- Peça atingiu estoque mínimo
+- Necessidade urgente identificada em OS
+
+**Tabela Existente**: `pedidos_compra`
+```sql
+id INTEGER PRIMARY KEY
+fornecedor_id INTEGER (nullable inicialmente)
+estoque_id INTEGER FK
+quantidade DECIMAL(10,3)
+data_solicitacao DATETIME
+data_chegada DATETIME (nullable)
+status VARCHAR(20) -- pendente, aprovado, encomendado, entregue, cancelado
+```
+
+**Fluxo - Técnico Solicita**:
+1. Na tela de OS, ao tentar adicionar peça sem saldo:
+   - Sistema exibe mensagem: "Estoque insuficiente"
+   - Aparece botão "Solicitar Compra"
+2. Técnico clica → Modal abre
+3. Preenche quantidade necessária
+4. Sistema cria `PedidoCompra`:
+   - `status='pendente'`
+   - `fornecedor_id=NULL` (será definido na aprovação)
+   - `estoque_id` e `quantidade` preenchidos
+5. Notificação enviada ao setor de compras
+
+**Fluxo - Solicitação Direta no Estoque**:
+1. No painel `/os/estoque/painel`
+2. Item com badge "BAIXO" tem botão "Comprar"
+3. Clica → abre modal rápido
+4. Informa quantidade → Cria pedido pendente
+
+**Endpoint**:
+```python
+POST /os/<os_id>/solicitar-compra-peca
+Body: {
+  estoque_id: int,
+  quantidade: float
+}
+Response: {
+  success: bool,
+  mensagem: "Solicitação criada (Pedido #123)"
+}
+
+# OU diretamente do estoque:
+POST /os/api/estoque/solicitar-compra
+Body: {
+  estoque_id: int,
+  quantidade: float
+}
+```
+
+**Regras**:
+- RN020: Qualquer usuário logado pode solicitar compra
+- RN021: Sistema busca primeiro fornecedor vinculado ao item (CatalogoFornecedor)
+- RN022: Se nenhum fornecedor vinculado, pega o primeiro da base (ou gera erro)
+- RN023: Pedidos pendentes vão para fila de aprovação do comprador
+
+---
+
+### 3.3 Painel de Estoque (UI)
+
+**Rota**: `/os/painel-estoque`
+
+**Elementos Visuais**:
+```html
+<table>
+  <tr>
+    <td>Nome / Código</td>
+    <td>Categoria</td>
+    <td>
+      Saldo Total: 45 UN
+      <small>Meu Local: 12 UN</small> <!-- Se técnico -->
+      <small>Distribuição: A(20) B(15) C(10)</small> <!-- Se admin -->
+    </td>
+    <td>Valor Unit.</td>
+    <td>
+      <badge>BAIXO</badge> + Botão "Comprar"
+      OU
+      <badge>Normal</badge>
+    </td>
+    <td>
+      <dropdown>
+        - Transferir
+        - Ajuste Rápido
+      </dropdown>
+    </td>
+  </tr>
+</table>
+```
+
+**Botões Principais**:
+- 🆕 **Nova Entrada**: Abre modal de recebimento
+- 📋 **Histórico**: Lista movimentações (futuro)
+- 🛒 **Solicitar Compra**: Abre modal de pedido em lote (futuro)
+
+---
+
+### 3.4 Interação com OS
+
+**Cenário 1 - Estoque Disponível Localmente**:
+1. Técnico em OS da Unidade A
+2. Adiciona "Cabo de Aço" (5 unidades)
+3. Sistema verifica `estoque_saldo` onde `unidade_id=A`
+4. Saldo local = 10 → OK
+5. Desconta 5 do saldo local
+6. Cria `MovimentacaoEstoque` (tipo='consumo', unidade_id=A)
+
+**Cenário 2 - Estoque Insuficiente Local, Disponível Global**:
+1. Técnico em OS da Unidade B
+2. Tenta adicionar "Rolamento" (3 unidades)
+3. Saldo local B = 0, mas saldo global = 15 (A tem 15)
+4. Sistema retorna erro:
+   ```json
+   {
+     "success": false,
+     "erro": "Estoque insuficiente na Unidade B. Disponível: 0 UN. (Há 15 UN no estoque global. Solicite transferência)"
+   }
+   ```
+5. Interface exibe botão "Solicitar Transferência"
+6. Abre modal pré-preenchido:
+   - Origem: Unidade A (detectada automaticamente)
+   - Destino: Unidade B (da OS)
+   - Item: Rolamento
+   - Qtd: 3
+
+**Cenário 3 - Sem Estoque em Nenhuma Unidade**:
+1. Saldo global = 0
+2. Sistema retorna:
+   ```json
+   {
+     "success": false,
+     "erro": "Item indisponível. Solicite compra."
+   }
+   ```
+3. Interface exibe botão "Solicitar Compra"
+4. Abre modal de pedido
+
+---
+
+## MÓDULO 4: Central de Compras ⭐ (NOVO)
+
+### 4.1 Visão Geral
+Painel exclusivo para aprovação e gestão de pedidos de compra solicitados por técnicos/usuários.
+
+### 4.2 Rota Principal
+```
+GET /admin/compras
+```
+
+**Permissões**:
+- `current_user.tipo == 'comprador'` OU `admin`
+
+### 4.3 Interface (Abas)
+
+#### Aba 1: Pendentes
+**Objetivo**: Aprovar ou rejeitar solicitações
+
+**Tabela**:
+| Item | Qtd Solic. | Data | Status Estoque | Ações |
+|------|-----------|------|----------------|-------|
+| Cabo de Aço | 50 M | 18/12 10:30 | 🔴 Crítico | ✅ Aprovar ❌ Rejeitar |
+| Fusível 10A | 100 UN | 18/12 09:15 | ⚠️ Reposição | ✅ Aprovar ❌ Rejeitar |
+
+**Fluxo - Aprovar**:
+1. Comprador clica "Aprovar"
+2. Modal abre:
+   - **Selecionar Fornecedor**: Dropdown com fornecedores vinculados ao item
+     - Exibe: Nome | Prazo médio | Histórico de entregas
+     - Ordenado por menor prazo
+   - **Previsão de Chegada**: Input date (calculado automaticamente com base no prazo)
+3. Comprador confirma
+4. Sistema:
+   - Atualiza `status='aprovado'`
+   - Define `fornecedor_id`
+   - Define `data_chegada` estimada
+   - Envia email/notificação ao fornecedor (futuro)
+
+**Fluxo - Rejeitar**:
+1. Clica "Rejeitar"
+2. Confirma em modal simples
+3. `status='cancelado'`
+4. Notifica solicitante (futuro)
+
+**Endpoints**:
+```python
+POST /admin/api/compras/<id>/aprovar
+Body: {
+  fornecedor_id: int,
+  data_chegada: "YYYY-MM-DD"
+}
+
+POST /admin/api/compras/<id>/rejeitar
+```
+
+#### Aba 2: A Receber (Aprovados/Em Trânsito)
+**Objetivo**: Confirmar recebimento físico
+
+**Tabela**:
+| Pedido # | Item | Fornecedor | Previsão | Ação |
+|----------|------|-----------|----------|------|
+| #123 | Rolamento 608ZZ | FornX | 20/12 | 📦 Receber |
+| #124 | Silicone Spray | FornY | 22/12 | 📦 Receber |
+
+**Fluxo - Receber**:
+1. Comprador clica "Receber"
+2. Confirma recebimento
+3. Sistema:
+   - Atualiza `status='entregue'`
+   - Define `data_chegada=now()` (data real)
+   - **IMPORTANTE**: Incrementa saldo do estoque
+     - Cria/Atualiza `EstoqueSaldo` na unidade do comprador
+     - OU abre modal para selecionar unidade destino
+   - Registra `MovimentacaoEstoque` (tipo='entrada')
+   - Atualiza prazo médio do fornecedor:
+     ```python
+     dias_reais = (data_chegada - data_solicitacao).days
+     fornecedor.prazo_medio = (prazo_medio * entregas + dias_reais) / (entregas + 1)
+     fornecedor.total_pedidos_entregues += 1
+     ```
+
+**Endpoint**:
+```python
+POST /admin/api/compras/<id>/receber
+Body: {
+  unidade_destino_id?: int  # Opcional, se quiser definir
+}
+Response: {
+  success: bool
+}
+```
+
+#### Aba 3: Histórico
+**Objetivo**: Auditoria de compras passadas
+
+**Filtros**:
+- Por data (últimos 30/60/90 dias)
+- Por fornecedor
+- Por status (entregue, cancelado)
+
+**Exibição**:
+- Timeline visual
+- Gráfico de tempo médio de entrega por fornecedor
+- Total gasto no período
+
+### 4.4 Regras de Negócio
+- RN024: Apenas comprador/admin acessa `/admin/compras`
+- RN025: Pedido aprovado não pode ser rejeitado
+- RN026: Recebimento atualiza automaticamente estoque
+- RN027: Histórico imutável (audit trail)
+- RN028: Prazo médio do fornecedor recalculado a cada entrega
+
+### 4.5 Integrações
+- **Estoque**: Recebimento incrementa saldo
+- **Fornecedores**: Atualiza métricas de performance
+- **Notificações**: Alerta solicitante quando pedido chegar (futuro)
+
+---
+
+## MÓDULO 5: Gestão de Fornecedores
+
+### 5.1 Funcionalidades Existentes
+- Cadastro de fornecedores
+- Vinculação de peças ao catálogo
+- Definição de preço e prazo por item
+- API de busca de fornecedores por peça
+
+### 5.2 Melhorias Propostas (Futuro)
+- Ranking automático por prazo/confiabilidade
+- Histórico de cotações
+- Integração com sistema do fornecedor (API)
+- Avaliação pós-entrega
+
+---
+
+## MÓDULO 6: Notificações e Alertas
+
+### 6.1 Tipos de Notificações
+1. **OS Vencendo**: Prazo < 24h
+2. **Estoque Baixo**: qtd_atual <= qtd_minima
+3. **Pedido Aprovado**: Para solicitante
+4. **Pedido Recebido**: Para solicitante
+5. **Transferência Aprovada**: Para solicitante
+
+### 6.2 Canais
+- In-app (banner no dashboard)
+- Email (futuro)
+- Push notification (futuro)
+
+### 6.3 Endpoint
+```
+GET /api/notifications
+Response: {
+  count: int,
+  alerts: [
+    {
+      type: "urgent" | "warning" | "info",
+      message: string,
+      url: string,
+      timestamp: ISO8601
+    }
+  ]
+}
+```
+
+---
+
+## MÓDULO 7: Terceirizados (Existente)
+
+### 7.1 Funcionalidades
+- Cadastro de prestadores
+- Criação de chamados externos
+- Notificação via WhatsApp (MegaAPI)
+- Cobrança automática de atrasos
+- Histórico de serviços
+
+*(Sem alterações propostas neste PRD)*
+
+---
+
+## MÓDULO 8: Relatórios e KPIs
+
+### 8.1 KPIs Atuais
+- MTTR Médio (Mean Time To Repair)
+- OSs Concluídas
+- Estoque Baixo (count)
+
+### 8.2 Novos KPIs Propostos
+- **Giro de Estoque**: Saídas / Estoque Médio (por período)
+- **Taxa de Transferências**: Transferências / Total Movimentações
+- **Tempo Médio de Aprovação de Compra**: Média (data_aprovacao - data_solicitacao)
+- **Acuracidade de Prazo do Fornecedor**: % entregas no prazo
+- **Custo Médio por OS**: Total peças consumidas / OSs concluídas
+
+---
+
+## Fluxo Completo: Da Solicitação ao Recebimento
+
+### Cenário: Técnico precisa de rolamento sem estoque
+
+1. **[OS] Técnico tenta adicionar peça**
+   ```
+   POST /os/123/adicionar-peca
+   Body: {estoque_id: 45, quantidade: 2}
+   → Erro: "Estoque insuficiente"
+   ```
+
+2. **[OS] Técnico solicita compra**
+   ```
+   POST /os/123/solicitar-compra-peca
+   Body: {estoque_id: 45, quantidade: 2}
+   → Cria PedidoCompra #789 (status='pendente')
+   → Toast: "Solicitação criada!"
+   ```
+
+3. **[Compras] Comprador recebe alerta**
+   ```
+   GET /admin/compras (aba Pendentes)
+   → Vê pedido #789 na lista
+   ```
+
+4. **[Compras] Comprador aprova**
+   ```
+   Clica "Aprovar" → Modal abre
+   Seleciona: Fornecedor XYZ (prazo 5 dias)
+   Data chegada: 23/12/2025
+   POST /admin/api/compras/789/aprovar
+   → status='aprovado'
+   → Notificação para técnico (futuro)
+   ```
+
+5. **[Compras] Material chega**
+   ```
+   Dia 23/12:
+   Comprador acessa aba "A Receber"
+   Clica "Receber" no pedido #789
+   Modal: "Em qual unidade chegou?" → Seleciona Unidade B
+   POST /admin/api/compras/789/receber
+   → Cria EstoqueSaldo (unidade_id=B, quantidade=2)
+   → Cria MovimentacaoEstoque (tipo='entrada')
+   → Atualiza prazo_medio do fornecedor
+   → status='entregue'
+   ```
+
+6. **[OS] Técnico usa a peça**
+   ```
+   Volta à OS #123
+   POST /os/123/adicionar-peca
+   Body: {estoque_id: 45, quantidade: 2}
+   → Agora tem saldo local → Sucesso!
+   → Desconta de EstoqueSaldo (unidade B)
+   ```
+
+---
+
+## Modelo de Dados - Resumo
+
+```mermaid
+erDiagram
+    Estoque ||--o{ EstoqueSaldo : "tem_saldo_em"
+    EstoqueSaldo }o--|| Unidade : "localizado_em"
+    
+    Estoque ||--o{ PedidoCompra : "pedidos"
+    PedidoCompra }o--|| Fornecedor : "fornecido_por"
+    
+    Estoque ||--o{ MovimentacaoEstoque : "movimenta"
+    MovimentacaoEstoque }o--|| OrdemServico : "vinculada_a"
+    MovimentacaoEstoque }o--|| Unidade : "ocorreu_em"
+    
+    SolicitacaoTransferencia }o--|| Estoque : "transfere"
+    SolicitacaoTransferencia }o--|| Unidade : "origem"
+    SolicitacaoTransferencia }o--|| Unidade : "destino"
+    SolicitacaoTransferencia }o--|| Usuario : "solicitado_por"
+```
+
+---
+
+## Priorização de Desenvolvimento
+
+### Sprint 1 (Crítico) ⭐
+- [x] Tabela `estoque_saldo` implementada
+- [x] Lógica de consumo por unidade
+- [ ] **Nova Entrada de Estoque** (modal + endpoint)
+- [ ] **Solicitação de Compra** (botão + modal + endpoint)
+
+### Sprint 2 (Alta Prioridade)
+- [ ] **Central de Compras** (painel completo)
+- [ ] Aprovação de pedidos
+- [ ] Recebimento com atualização de estoque
+- [ ] Transferência entre unidades (solicitação)
+
+### Sprint 3 (Média Prioridade)
+- [ ] Aprovação de transferências (workflow)
+- [ ] Histórico de movimentações
+- [ ] Relatório de giro de estoque
+- [ ] Métricas de fornecedores
+
+### Sprint 4 (Baixa Prioridade / Futuro)
+- [ ] Notificações por email
+- [ ] Dashboard analítico avançado
+- [ ] Integração API fornecedores
+- [ ] App mobile (React Native)
+
+---
+
+## Segurança e Auditoria
+
+### Logs Obrigatórios
+- Todas as movimentações de estoque (`MovimentacaoEstoque`)
+- Aprovações/Rejeições de pedidos
+- Transferências entre unidades
+- Alterações em valores unitários
+
+### Constraints de Segurança
+- Usuário só vê saldo da própria unidade (exceto admin)
+- Comprador não pode editar estoque diretamente
+- Técnico não pode aprovar próprias transferências
+- Histórico de movimentações imutável
+
+---

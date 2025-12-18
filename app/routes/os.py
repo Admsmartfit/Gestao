@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from app.extensions import db
 from app.models.models import Unidade, Usuario
-from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, Equipamento, AnexosOS, PedidoCompra
+from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, Equipamento, AnexosOS, PedidoCompra, EstoqueSaldo, MovimentacaoEstoque
 from app.models.terceirizados_models import Terceirizado, ChamadoExterno
 from app.services.os_service import OSService
 from app.services.estoque_service import EstoqueService
@@ -63,24 +63,26 @@ def detalhes(id):
     os_obj = OrdemServico.query.get_or_404(id)
     categorias = CategoriaEstoque.query.all()
     
-    # CORREÇÃO DO ERRO 1: Carregar todas as peças para o modal de solicitação
+    # Carregar todas as peças para o modal de solicitação
     todas_pecas = Estoque.query.order_by(Estoque.nome).all()
     
-    # Filtra terceirizados: Globais (None) OU da Unidade da OS
+    # [CORREÇÃO APLICADA AQUI]
+    # Filtra terceirizados: Globais (abrangencia_global=True) OU que atendam a Unidade da OS
     terceirizados = Terceirizado.query.filter(
-        (Terceirizado.unidade_id == None) | (Terceirizado.unidade_id == os_obj.unidade_id)
+        (Terceirizado.abrangencia_global == True) | 
+        (Terceirizado.unidades.any(id=os_obj.unidade_id))
     ).filter_by(ativo=True).order_by(Terceirizado.nome).all()
 
     if not terceirizados:
-        flash('Nenhum prestador cadastrado. Cadastre em Configurações primeiro.', 'warning')
+        # Apenas um aviso discreto se não houver ninguém, não impede o carregamento
+        pass 
     
     return render_template('os_detalhes.html', 
                          os=os_obj, 
                          categorias=categorias,
                          todas_pecas=todas_pecas,
-                         terceirizados=terceirizados) # Passando a variável aqui
+                         terceirizados=terceirizados)
 
-# CORREÇÃO DO ERRO 2: Nova rota para concluir a OS
 @bp.route('/<int:id>/concluir', methods=['POST'])
 @login_required
 def concluir_os(id):
@@ -132,7 +134,42 @@ def adicionar_peca(id):
             'alerta': alerta_minimo
         })
     except Exception as e:
-        return jsonify({'success': False, 'erro': str(e)}), 400
+        erro_msg = str(e)
+        os_obj = OrdemServico.query.get(id)
+        
+        # Se o erro sugerir transferência ou compra, retornamos dados extras
+        if os_obj:
+            estoque_id = data.get('estoque_id')
+            qtd_pedida = float(data.get('quantidade', 0))
+            item = Estoque.query.get(estoque_id)
+            
+            if item:
+                if "Solicite transferência" in erro_msg or "Solicite compra" in erro_msg:
+                    # Busca distribuição
+                    saldos = EstoqueSaldo.query.filter(
+                        EstoqueSaldo.estoque_id == estoque_id,
+                        EstoqueSaldo.quantidade > 0
+                    ).all()
+                    
+                    sugestoes = []
+                    for s in saldos:
+                        if s.unidade_id != os_obj.unidade_id:
+                            sugestoes.append({
+                                'unidade_id': s.unidade_id,
+                                'unidade_nome': s.unidade.nome,
+                                'saldo': float(s.quantidade)
+                            })
+                    
+                    return jsonify({
+                        'success': False,
+                        'erro': erro_msg,
+                        'sugestoes_transferencia': sugestoes,
+                        'unidade_destino_id': os_obj.unidade_id,
+                        'unidade_destino_nome': os_obj.unidade.nome,
+                        'quantidade_solicitada': qtd_pedida
+                    }), 400
+                
+        return jsonify({'success': False, 'erro': erro_msg}), 400
 
 @bp.route('/<int:id>/solicitar-compra-peca', methods=['POST'])
 @login_required
@@ -168,7 +205,8 @@ def solicitar_compra_peca(id):
             estoque_id=estoque_id,
             quantidade=quantidade,
             status='pendente',
-            data_solicitacao=datetime.utcnow()
+            data_solicitacao=datetime.utcnow(),
+            solicitante_id=current_user.id
         )
         
         db.session.add(novo_pedido)
@@ -227,6 +265,35 @@ def upload_anexos(id):
             
     return redirect(url_for('os.detalhes', id=id))
     
+@bp.route('/api/estoque/<int:id>/disponibilidade')
+@login_required
+def disponibilidade_estoque(id):
+    """
+    API para verificar saldo global e distribuição por unidade de um item.
+    """
+    item = Estoque.query.get_or_404(id)
+    saldos = EstoqueSaldo.query.filter_by(estoque_id=id).all()
+    
+    distribuicao = []
+    for s in saldos:
+        if s.quantidade > 0:
+            distribuicao.append({
+                'unidade_id': s.unidade_id,
+                'unidade_nome': s.unidade.nome,
+                'saldo': float(s.quantidade)
+            })
+            
+    saldo_global = float(item.quantidade_atual)
+    
+    return jsonify({
+        'item_id': item.id,
+        'item_nome': item.nome,
+        'saldo_global': saldo_global,
+        'unidade_medida': item.unidade_medida,
+        'distribuicao': distribuicao,
+        'recomendacao': 'transferencia' if saldo_global > 0 else 'compra'
+    })
+
 @bp.route('/api/pecas/buscar')
 @login_required
 def buscar_pecas():
@@ -276,7 +343,8 @@ def solicitar_compra():
             fornecedor_id=fornecedor_id,
             quantidade=quantidade,
             status='pendente',
-            data_solicitacao=datetime.utcnow()
+            data_solicitacao=datetime.utcnow(),
+            solicitante_id=current_user.id
         )
 
         db.session.add(pedido)
@@ -395,7 +463,23 @@ def adicionar_tarefa_externa(id):
 
     return redirect(url_for('os.detalhes', id=id))
 
-@bp.route('/<int:id>/editar', methods=['POST'])
+@bp.route('/api/estoque/historico')
+@login_required
+def historico_estoque():
+    """Retorna as últimas 30 movimentações de estoque."""
+    movs = MovimentacaoEstoque.query.order_by(MovimentacaoEstoque.data_movimentacao.desc()).limit(30).all()
+    
+    return jsonify([{
+        'data': m.data_movimentacao.strftime('%d/%m/%Y %H:%M'),
+        'item': m.estoque.nome,
+        'tipo': m.tipo_movimentacao.capitalize(),
+        'qtd': float(m.quantidade),
+        'unidade': m.unidade.nome if m.unidade else 'N/A',
+        'usuario': m.usuario.nome if m.usuario else 'Sistema',
+        'motivo': m.observacao or '-'
+    } for m in movs])
+
+@bp.route('/<int:id>/editar-os', methods=['POST'])
 @login_required
 def editar_os(id):
     os_obj = OrdemServico.query.get_or_404(id)

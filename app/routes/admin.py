@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.models.models import Unidade, Usuario
-from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico, PedidoCompra
+from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico, PedidoCompra, EstoqueSaldo, MovimentacaoEstoque
 from datetime import datetime
 from app.models.terceirizados_models import Terceirizado
 from app.extensions import db
@@ -272,27 +272,36 @@ def vincular_peca_fornecedor():
 @bp.route('/terceirizado/novo', methods=['POST'])
 @login_required
 def novo_terceirizado():
-    unidade_id = request.form.get('unidade_id')
-    # Se vazio, é None (Global)
-    if not unidade_id:
-        unidade_id = None
-        
+    # Captura a lista de IDs selecionados
+    unidades_ids = request.form.getlist('unidades') 
+    
     novo_terc = Terceirizado(
         nome=request.form.get('nome'),
         nome_empresa=request.form.get('nome_empresa'),
         cnpj=request.form.get('cnpj'),
         telefone=request.form.get('telefone'),
         email=request.form.get('email'),
-        especialidades=request.form.get('especialidades'), # Salva como String simples
-        unidade_id=unidade_id,
+        especialidades=request.form.get('especialidades'),
         ativo=True
     )
+
+    # Lógica de Abrangência
+    if 'global' in unidades_ids or not unidades_ids:
+        # Se selecionou "Global" ou não selecionou nada (assume global por padrão ou erro, dependendo da regra)
+        novo_terc.abrangencia_global = True
+    else:
+        novo_terc.abrangencia_global = False
+        # Adiciona as unidades selecionadas
+        for uid in unidades_ids:
+            unidade = Unidade.query.get(int(uid))
+            if unidade:
+                novo_terc.unidades.append(unidade)
     
     db.session.add(novo_terc)
     db.session.commit()
     flash('Prestador de Serviço cadastrado com sucesso!', 'success')
     return redirect(url_for('admin.dashboard', tab='terceirizados'))
-
+    
 @bp.route('/terceirizado/excluir/<int:id>')
 @login_required
 def excluir_terceirizado(id):
@@ -368,28 +377,51 @@ def compras_painel():
     # Histórico (concluidos ou cancelados)
     historico = PedidoCompra.query.filter(PedidoCompra.status.in_(['entregue', 'cancelado'])).order_by(PedidoCompra.data_solicitacao.desc()).limit(20).all()
     
-    # CORREÇÃO: Carregar fornecedores sempre, pois o modal de aprovação no template precisa dessa lista
+    # Dados para modais (fornecedores e unidades)
     fornecedores = Fornecedor.query.all()
+    unidades = Unidade.query.all()
     
     return render_template('compras.html', 
                          pendentes=pendentes, 
                          aprovados=aprovados, 
                          historico=historico, 
-                         fornecedores=fornecedores)
+                         fornecedores=fornecedores,
+                         unidades=unidades,
+                         today=datetime.utcnow().date())
 @bp.route('/api/compras/<int:id>/aprovar', methods=['POST'])
 @login_required
 def aprovar_pedido(id):
+    if current_user.tipo not in ['admin', 'comprador']:
+        return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
+        
     pedido = PedidoCompra.query.get_or_404(id)
+    
+    if pedido.status != 'pendente':
+        return jsonify({'success': False, 'erro': 'Apenas pedidos pendentes podem ser aprovados.'}), 400
+        
     data = request.get_json()
+    fornecedor_id = data.get('fornecedor_id')
+    data_chegada_str = data.get('data_chegada')
+    
+    if not fornecedor_id:
+        return jsonify({'success': False, 'erro': 'Fornecedor é obrigatório para aprovação.'}), 400
+        
+    fornecedor = Fornecedor.query.get(fornecedor_id)
+    if not fornecedor:
+        return jsonify({'success': False, 'erro': 'Fornecedor não encontrado.'}), 404
     
     pedido.status = 'aprovado'
-    pedido.fornecedor_id = data.get('fornecedor_id')
+    pedido.fornecedor_id = fornecedor_id
+    pedido.aprovador_id = current_user.id
     
     # Data de Chegada Estimada
-    data_chegada_str = data.get('data_chegada')
     if data_chegada_str:
-        from datetime import datetime
-        pedido.data_chegada = datetime.strptime(data_chegada_str, '%Y-%m-%d')
+        try:
+            pedido.data_chegada = datetime.strptime(data_chegada_str, '%Y-%m-%d')
+            if pedido.data_chegada.date() < datetime.utcnow().date():
+                 return jsonify({'success': False, 'erro': 'A data de chegada deve ser futura.'}), 400
+        except ValueError:
+             return jsonify({'success': False, 'erro': 'Formato de data inválido.'}), 400
         
     db.session.commit()
     return jsonify({'success': True})
@@ -397,29 +429,92 @@ def aprovar_pedido(id):
 @bp.route('/api/compras/<int:id>/rejeitar', methods=['POST'])
 @login_required
 def rejeitar_pedido(id):
+    if current_user.tipo not in ['admin', 'comprador']:
+        return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
+
     pedido = PedidoCompra.query.get_or_404(id)
     pedido.status = 'cancelado'
+    pedido.aprovador_id = current_user.id
     db.session.commit()
     return jsonify({'success': True})
 
 @bp.route('/api/compras/<int:id>/receber', methods=['POST'])
 @login_required
 def receber_pedido(id):
+    if current_user.tipo not in ['admin', 'comprador']:
+        return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
+
     pedido = PedidoCompra.query.get_or_404(id)
     if pedido.status == 'entregue':
-        return jsonify({'success': False, 'erro': 'Já recebido'}), 400
+        return jsonify({'success': False, 'erro': 'Este pedido já foi recebido.'}), 400
+    
+    if pedido.status != 'aprovado':
+         return jsonify({'success': False, 'erro': 'Apenas pedidos aprovados podem ser recebidos.'}), 400
+
+    data = request.get_json() or {}
+    unidade_id = data.get('unidade_destino_id') or current_user.unidade_padrao_id
+    
+    if not unidade_id:
+        return jsonify({'success': False, 'erro': 'Unidade de destino não informada.'}), 400
+
+    try:
+        # 1. Atualiza Status e Datas
+        agora = datetime.utcnow()
+        # Calcula dias reais entre solicitação e recebimento
+        dias_real = (agora - pedido.data_solicitacao).days
+        if dias_real < 0: dias_real = 0 # Segurança caso relógio mude
         
-    # Atualiza Status
-    pedido.status = 'entregue'
-    pedido.data_chegada = datetime.utcnow() # Data Real da Chegada
-    
-    # Atualiza Estoque
-    estoque = Estoque.query.get(pedido.estoque_id)
-    estoque.quantidade_atual += pedido.quantidade
-    
-    # Registra Movimentação (Opcional, mas ideal)
-    # Precisaria importar MovimentacaoEstoque.
-    # Vou deixar simples por agora, focando na atualização do saldo.
-    
-    db.session.commit()
-    return jsonify({'success': True})
+        pedido.status = 'entregue'
+        pedido.data_chegada = agora # Data Real da Chegada
+        pedido.recebedor_id = current_user.id
+        
+        # 2. Atualiza Saldo Global (Estoque)
+        estoque = Estoque.query.get(pedido.estoque_id)
+        estoque.quantidade_atual += pedido.quantidade
+        
+        # 3. Atualiza Saldo por Unidade (EstoqueSaldo)
+        saldo_unidade = EstoqueSaldo.query.filter_by(
+            estoque_id=pedido.estoque_id, 
+            unidade_id=unidade_id
+        ).first()
+        
+        if not saldo_unidade:
+            saldo_unidade = EstoqueSaldo(
+                estoque_id=pedido.estoque_id,
+                unidade_id=unidade_id,
+                quantidade=pedido.quantidade
+            )
+            db.session.add(saldo_unidade)
+        else:
+            saldo_unidade.quantidade += pedido.quantidade
+            
+        # 4. Registra Movimentação (entrada)
+        mov = MovimentacaoEstoque(
+            estoque_id=pedido.estoque_id,
+            usuario_id=current_user.id,
+            unidade_id=unidade_id,
+            tipo_movimentacao='entrada',
+            quantidade=pedido.quantidade,
+            observacao=f"Recebimento Pedido #{pedido.id}",
+            data_movimentacao=agora
+        )
+        db.session.add(mov)
+        
+        # 5. Atualiza Métricas do Fornecedor (Média Ponderada)
+        forn = pedido.fornecedor
+        if forn:
+            total_envios = forn.total_pedidos_entregues or 0
+            prazo_atual = forn.prazo_medio_entrega_dias or 0
+            
+            # RN028: Prazo médio é média ponderada
+            nova_media = (prazo_atual * total_envios + dias_real) / (total_envios + 1)
+            
+            forn.prazo_medio_entrega_dias = round(nova_media, 1)
+            forn.total_pedidos_entregues += 1
+            
+        db.session.commit()
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'erro': str(e)}), 500

@@ -43,6 +43,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('os.painel_estoque') }}">Estoque</a>
                     </li>
+                    {% if current_user.tipo in ['admin', 'comprador'] %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin.compras_painel') }}">Compras</a>
+                    </li>
+                    {% endif %}
                     {% if current_user.tipo == 'admin' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Configurações</a>
@@ -147,7 +152,7 @@
                 info: 'info-circle-fill'
             };
 
-            function show(message, type = 'info') {
+            function show(message, type = 'info', persistent = false) {
                 // Map Flask categories to visual types
                 if (type === 'error') type = 'danger';
 
@@ -161,16 +166,20 @@
                 toast.innerHTML = `
                     <i class="bi bi-${icons[type] || icons.info} fs-5 text-${type === 'info' ? 'primary' : type}"></i>
                     <div class="gmm-toast-content">
-                        <div class="gmm-toast-title">${type === 'danger' ? 'Erro' : type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                        <div class="gmm-toast-title">${type === 'danger' ? 'Erro' : (type === 'warning' ? 'Atenção' : type.charAt(0).toUpperCase() + type.slice(1))}</div>
                         <div class="gmm-toast-msg">${message}</div>
                     </div>
-                    <button class="btn-close btn-sm ms-2" onclick="this.parentElement.remove()" aria-label="Fechar"></button>
+                    <button class="btn-close btn-sm ms-2" onclick="ToastModule.remove(this.parentElement)" aria-label="Fechar"></button>
                 `;
 
                 container.appendChild(toast);
 
-                // Auto dismiss (4s)
-                setTimeout(() => remove(toast), 4000);
+                // Auto dismiss (4s) - Only if NOT persistent
+                if (!persistent) {
+                    setTimeout(() => remove(toast), 4000);
+                }
+
+                return toast; // Return toast element for manual removal if needed
             }
 
             function remove(el) {
@@ -179,7 +188,7 @@
                 el.addEventListener('animationend', () => el.remove());
             }
 
-            return { show };
+            return { show, remove };
         })();
 
         // Auto-initialize Flask Flash Messages

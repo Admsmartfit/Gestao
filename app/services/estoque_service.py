@@ -35,13 +35,18 @@ class EstoqueService:
         qtd_disponivel_local = saldo_local.quantidade if saldo_local else Decimal(0)
 
         if saldo_local is None or qtd_disponivel_local < qtd_decimal:
-            msg = f"Estoque insuficiente na unidade {os_obj.unidade.nome}. "
-            msg += f"Disponível: {qtd_disponivel_local} {item.unidade_medida}. "
             total_global = item.quantidade_atual
+            
             if total_global >= qtd_decimal:
-                msg += f"(Há {total_global} {item.unidade_medida} no estoque global. Solicite transferência ou entrada nesta unidade)."
+                msg = f"Estoque insuficiente na unidade {os_obj.unidade.nome}. "
+                msg += f"Disponível aqui: {qtd_disponivel_local}. "
+                msg += f"Estoque global: {total_global}. "
+                msg += "Solicite transferência de outra unidade."
             else:
-                msg += "Solicite compra ou entrada de estoque."
+                msg = f"Item indisponível em todas as unidades. "
+                msg += f"Saldo global: {total_global}. "
+                msg += "Solicite compra."
+            
             raise ValueError(msg)
             
         saldo_local.quantidade -= qtd_decimal

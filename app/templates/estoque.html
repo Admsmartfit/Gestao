@@ -54,32 +54,38 @@
                             </span>
                         </td>
                         <td data-label="Saldo">
-                            <div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual|float) }}</span>
-                                    <span class="text-muted small">{{ item.unidade_medida }}</span>
-                                </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual|float) }}</span>
+                                <span class="text-muted small">{{ item.unidade_medida }}</span>
 
-                                {% if current_user.tipo == 'admin' %}
-                                {# Visão Admin: Mostra distribuição em tooltip #}
-                                <small class="text-muted d-block mt-1" style="font-size: 0.7rem; cursor: help;"
-                                    title="{% for s in item.saldos %}{{ s.unidade.nome }}: {{ '{:g}'.format(s.quantidade) }}&#013;{% endfor %}">
-                                    <i class="bi bi-info-circle me-1"></i> Detalhes Distribuição
-                                </small>
-                                {% elif current_user.unidade_padrao_id %}
-                                {# Visão Local: Mostra saldo da unidade do usuário #}
-                                {% set ns = namespace(saldo_local=0) %}
-                                {% for s in item.saldos %}
-                                {% if s.unidade_id == current_user.unidade_padrao_id %}
-                                {% set ns.saldo_local = s.quantidade %}
-                                {% endif %}
-                                {% endfor %}
-                                <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">
-                                    Meu Local: <span class="fw-bold text-dark">{{ "{:g}".format(ns.saldo_local)
-                                        }}</span>
-                                </small>
-                                {% endif %}
+                                <!-- Ícone de Lupa para Ver Distribuição (Para todos, ou pelo menos Admin) -->
+                                <button class="btn btn-icon btn-sm p-0 text-primary opacity-75 hover-opacity-100"
+                                    onclick="verDistribuicao('{{ item.id }}', '{{ item.nome }}')"
+                                    title="Ver distribuição por unidade">
+                                    <i class="bi bi-search" style="font-size: 0.8rem;"></i>
+                                </button>
                             </div>
+
+                            {% if current_user.tipo == 'tecnico' and current_user.unidade_padrao_id %}
+                            {# Visão Local para Técnico #}
+                            {% set ns = namespace(saldo_local=0) %}
+                            {% for s in item.saldos %}
+                            {% if s.unidade_id == current_user.unidade_padrao_id %}
+                            {% set ns.saldo_local = s.quantidade %}
+                            {% endif %}
+                            {% endfor %}
+                            <div class="saldo-local">
+                                🏠 Meu Local: <span class="fw-bold">{{ "{:g}".format(ns.saldo_local) }}</span>
+                            </div>
+                            {% endif %}
+
+                            {% if current_user.tipo == 'admin' %}
+                            {# Tooltip adicional para Admin #}
+                            <small class="text-muted d-block mt-1" style="cursor: help; font-size: 0.7rem;"
+                                title="{% for s in item.saldos %}{{ s.unidade.nome }}: {{ '{:g}'.format(s.quantidade) }}&#013;{% endfor %}">
+                                <i class="bi bi-info-circle me-1"></i> Tooltip Rápido
+                            </small>
+                            {% endif %}
                         </td>
                         <td data-label="Valor Unit.">
                             <span class="text-muted">R$ {{ "{:.2f}".format(item.valor_unitario or 0) }}</span>
@@ -136,6 +142,36 @@
         </table>
     </div>
 </div>
+</div>
+
+<div class="modal fade" id="modalDistribuicao" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Distribuição de Estoque</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <h6 id="distItemNome" class="text-primary fw-bold mb-3"></h6>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Unidade</th>
+                                <th class="text-end">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="distTabelaCorpo">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-2 text-end">
+                    <small class="text-muted">Total Global: <span id="distTotalGlobal" class="fw-bold"></span></small>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="modalEntrada" tabindex="-1">
@@ -228,6 +264,41 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalSolicitarCompraGeral" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Nova Solicitação de Compra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <div class="mb-3 position-relative">
+                    <label class="form-label">Buscar Item</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i
+                                class="bi bi-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0" id="buscaPecaCompraGeral"
+                            placeholder="Digite o nome da peça...">
+                    </div>
+                    <div id="sugestoesCompraGeral" class="list-group position-absolute w-100 shadow-sm"
+                        style="display: none; z-index: 1055;"></div>
+                    <input type="hidden" id="pecaIdCompraGeral">
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Quantidade para Reposição</label>
+                    <input type="number" step="0.01" class="form-control form-control-lg" id="qtdCompraGeral" required>
+                </div>
+                <div class="d-grid mt-4">
+                    <button type="button" onclick="confirmarSolicitacaoCompraGeral()"
+                        class="btn btn-danger py-2 fw-bold" id="btnConfirmarCompraGeral">
+                        <i class="bi bi-cart-plus me-2"></i> Solicitar Compra
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalTransferencia" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -275,9 +346,23 @@
                         <input type="text" class="form-control" id="transfObs">
                     </div>
 
+                    <div class="alert alert-info py-2 small border-0 mb-3" id="transfInfoText">
+                        {% if current_user.tipo in ['admin', 'gerente'] %}
+                        <i class="bi bi-lightning-fill me-1"></i> Esta transferência será executada
+                        <strong>imediatamente</strong>.
+                        {% else %}
+                        <i class="bi bi-hourglass-split me-1"></i> Sua solicitação será enviada para
+                        <strong>aprovação</strong>.
+                        {% endif %}
+                    </div>
+
                     <div class="d-grid mt-4">
                         <button type="submit" class="btn btn-primary" id="btnSalvarTransf">
+                            {% if current_user.tipo in ['admin', 'gerente'] %}
+                            Executar Transferência
+                            {% else %}
                             Solicitar Transferência
+                            {% endif %}
                         </button>
                     </div>
                 </form>
@@ -286,7 +371,52 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalHistorico" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Histórico de Movimentações</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle small">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Item</th>
+                                <th>Tipo</th>
+                                <th>Qtd</th>
+                                <th>Unidade</th>
+                                <th>Usuário</th>
+                                <th>Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="histTabelaCorpo">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
+    .saldo-local {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+
+    .saldo-local .fw-bold {
+        color: var(--primary);
+    }
+
+    .btn-icon:hover {
+        background-color: var(--primary-light);
+    }
+
     .shimmer {
         animation: shimmer 2s infinite;
     }
@@ -318,13 +448,23 @@
 <script>
     let modalEntrada;
     let modalTransferencia;
-    const buscaInput = document.getElementById('buscaPecaInput');
-    const sugestoesDiv = document.getElementById('listaSugestoes');
+    let modalHistorico;
+    let modalCompraGeral;
+    let buscaInput;
+    let sugestoesDiv;
     let debounceTimer;
 
     document.addEventListener('DOMContentLoaded', () => {
         modalEntrada = new bootstrap.Modal(document.getElementById('modalEntrada'));
         modalTransferencia = new bootstrap.Modal(document.getElementById('modalTransferencia'));
+        modalHistorico = new bootstrap.Modal(document.getElementById('modalHistorico'));
+        modalCompraGeral = new bootstrap.Modal(document.getElementById('modalSolicitarCompraGeral'));
+
+        buscaInput = document.getElementById('buscaPecaInput');
+        sugestoesDiv = document.getElementById('listaSugestoes');
+
+        initBuscaInput();
+        initBuscaGeral();
     });
 
     function abrirModalEntrada() {
@@ -402,34 +542,36 @@
     }
 
     // Busca de Peças
-    buscaInput.addEventListener('input', function () {
-        clearTimeout(debounceTimer);
-        const termo = this.value;
-        if (termo.length < 2) {
-            sugestoesDiv.style.display = 'none';
-            return;
-        }
+    function initBuscaInput() {
+        buscaInput.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            const termo = this.value;
+            if (termo.length < 2) {
+                sugestoesDiv.style.display = 'none';
+                return;
+            }
 
-        debounceTimer = setTimeout(() => {
-            fetch(`/os/api/pecas/buscar?q=${termo}`)
-                .then(r => r.json())
-                .then(data => {
-                    sugestoesDiv.innerHTML = '';
-                    if (data.length > 0) {
-                        data.forEach(item => {
-                            const div = document.createElement('a');
-                            div.className = 'list-group-item list-group-item-action cursor-pointer';
-                            div.innerHTML = `<strong>${item.nome}</strong> <span class="text-muted small">(${item.saldo} ${item.unidade})</span>`;
-                            div.onclick = () => selecionarPeca(item);
-                            sugestoesDiv.appendChild(div);
-                        });
-                        sugestoesDiv.style.display = 'block';
-                    } else {
-                        sugestoesDiv.style.display = 'none';
-                    }
-                });
-        }, 300);
-    });
+            debounceTimer = setTimeout(() => {
+                fetch(`/os/api/pecas/buscar?q=${termo}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        sugestoesDiv.innerHTML = '';
+                        if (data.length > 0) {
+                            data.forEach(item => {
+                                const div = document.createElement('a');
+                                div.className = 'list-group-item list-group-item-action cursor-pointer';
+                                div.innerHTML = `<strong>${item.nome}</strong> <span class="text-muted small">(${item.saldo} ${item.unidade})</span>`;
+                                div.onclick = () => selecionarPeca(item);
+                                sugestoesDiv.appendChild(div);
+                            });
+                            sugestoesDiv.style.display = 'block';
+                        } else {
+                            sugestoesDiv.style.display = 'none';
+                        }
+                    });
+            }, 300);
+        });
+    }
 
     function selecionarPeca(item) {
         buscaInput.value = item.nome;
@@ -531,12 +673,166 @@
         }
     }
 
+
+
     function abrirModalCompraGeral() {
-        ToastModule.show("Funcionalidade de Pedido em Lote em desenvolvimento.", "info");
+        document.getElementById('pecaIdCompraGeral').value = '';
+        document.getElementById('buscaPecaCompraGeral').value = '';
+        document.getElementById('qtdCompraGeral').value = '';
+        document.getElementById('sugestoesCompraGeral').style.display = 'none';
+        modalCompraGeral.show();
     }
 
-    function abrirHistorico() {
-        ToastModule.show("Histórico completo será implementado em breve.", "info");
+    function initBuscaGeral() {
+        const buscaGeralInput = document.getElementById('buscaPecaCompraGeral');
+        const sugestoesGeralDiv = document.getElementById('sugestoesCompraGeral');
+
+        if (!buscaGeralInput) return;
+
+        buscaGeralInput.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            const termo = this.value;
+            if (termo.length < 2) {
+                sugestoesGeralDiv.style.display = 'none';
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetch(`/os/api/pecas/buscar?q=${termo}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        sugestoesGeralDiv.innerHTML = '';
+                        if (data.length > 0) {
+                            data.forEach(item => {
+                                const div = document.createElement('a');
+                                div.className = 'list-group-item list-group-item-action cursor-pointer';
+                                div.innerHTML = `<strong>${item.nome}</strong> <span class="text-muted small">(${item.saldo} ${item.unidade})</span>`;
+                                div.onclick = () => {
+                                    buscaGeralInput.value = item.nome;
+                                    document.getElementById('pecaIdCompraGeral').value = item.id;
+                                    sugestoesGeralDiv.style.display = 'none';
+                                };
+                                sugestoesGeralDiv.appendChild(div);
+                            });
+                            sugestoesGeralDiv.style.display = 'block';
+                        } else {
+                            sugestoesGeralDiv.style.display = 'none';
+                        }
+                    });
+            }, 300);
+        });
+    }
+
+    async function confirmarSolicitacaoCompraGeral() {
+        const id = document.getElementById('pecaIdCompraGeral').value;
+        const qtd = document.getElementById('qtdCompraGeral').value;
+        const btn = document.getElementById('btnConfirmarCompraGeral');
+
+        if (!id) {
+            ToastModule.show("Selecione um item da lista.", "warning");
+            return;
+        }
+
+        if (!qtd || qtd <= 0) {
+            ToastModule.show("Informe uma quantidade válida.", "warning");
+            return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Solicitando...';
+
+        try {
+            const res = await fetch('/os/api/estoque/solicitar-compra', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    estoque_id: id,
+                    quantidade: parseFloat(qtd)
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                ToastModule.show("Solicitação de compra enviada!", "success");
+                modalCompraGeral.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                ToastModule.show("Erro: " + data.erro, "danger");
+            }
+        } catch (e) {
+            ToastModule.show("Erro ao conectar.", "danger");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
+    async function abrirHistorico() {
+        const corpo = document.getElementById('histTabelaCorpo');
+        corpo.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
+
+        modalHistorico.show();
+
+        try {
+            const res = await fetch('/os/api/estoque/historico');
+            const data = await res.json();
+
+            corpo.innerHTML = '';
+            if (data.length > 0) {
+                data.forEach(m => {
+                    const tr = document.createElement('tr');
+                    const corTipo = m.tipo.toLowerCase() === 'entrada' ? 'text-success' : 'text-danger';
+                    tr.innerHTML = `
+                        <td class="text-muted">${m.data}</td>
+                        <td class="fw-bold">${m.item}</td>
+                        <td class="${corTipo}">${m.tipo}</td>
+                        <td class="fw-bold">${m.qtd}</td>
+                        <td>${m.unidade}</td>
+                        <td class="text-muted">${m.usuario}</td>
+                    `;
+                    corpo.appendChild(tr);
+                });
+            } else {
+                corpo.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Nenhuma movimentação recente.</td></tr>';
+            }
+        } catch (e) {
+            corpo.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger">Erro ao carregar histórico.</td></tr>';
+        }
+    }
+
+    async function verDistribuicao(id, nome) {
+        const nomeEl = document.getElementById('distItemNome');
+        const corpo = document.getElementById('distTabelaCorpo');
+        const total = document.getElementById('distTotalGlobal');
+
+        nomeEl.innerText = nome;
+        corpo.innerHTML = '<tr><td colspan="2" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
+        total.innerText = '...';
+
+        const modal = new bootstrap.Modal(document.getElementById('modalDistribuicao'));
+        modal.show();
+
+        try {
+            const res = await fetch(`/os/api/estoque/${id}/disponibilidade`);
+            const data = await res.json();
+
+            corpo.innerHTML = '';
+            if (data.distribuicao && data.distribuicao.length > 0) {
+                data.distribuicao.forEach(d => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${d.unidade_nome}</td>
+                        <td class="text-end fw-bold">${d.saldo} ${data.unidade_medida}</td>
+                    `;
+                    corpo.appendChild(tr);
+                });
+            } else {
+                corpo.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-muted">Sem saldo em nenhuma unidade.</td></tr>';
+            }
+            total.innerText = `${data.saldo_global} ${data.unidade_medida}`;
+        } catch (e) {
+            corpo.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-danger">Erro ao carregar distribuição.</td></tr>';
+        }
     }
 
     // Fecha sugestões ao clicar fora

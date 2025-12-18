@@ -1,7 +1,13 @@
 from datetime import datetime
 from app.extensions import db
-from app.models.models import Usuario
+from app.models.models import Usuario, Unidade
 from app.models.estoque_models import OrdemServico
+
+# 1. Tabela de Associação definida ANTES da classe que a utiliza
+terceirizados_unidades = db.Table('terceirizados_unidades',
+    db.Column('terceirizado_id', db.Integer, db.ForeignKey('terceirizados.id'), primary_key=True),
+    db.Column('unidade_id', db.Integer, db.ForeignKey('unidades.id'), primary_key=True)
+)
 
 class Terceirizado(db.Model):
     __tablename__ = 'terceirizados'
@@ -18,9 +24,13 @@ class Terceirizado(db.Model):
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # [Novo] Vinculação à Unidade (ou Null para Global)
-    unidade_id = db.Column(db.Integer, db.ForeignKey('unidades.id'), nullable=True)
-    unidade = db.relationship('Unidade', backref='terceirizados')
+    # [Novo] Controle de Abrangência
+    # Se True, o prestador aparece para todas as unidades, ignorando a lista abaixo.
+    abrangencia_global = db.Column(db.Boolean, default=False)
+    
+    # Relacionamento Muitos-para-Muitos com Unidades
+    # secondary aponta para a tabela definida no início do arquivo
+    unidades = db.relationship('Unidade', secondary=terceirizados_unidades, backref=db.backref('prestadores', lazy='dynamic'))
 
 class ChamadoExterno(db.Model):
     __tablename__ = 'chamados_externos'

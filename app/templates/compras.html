@@ -1,217 +1,447 @@
 {% extends "base.html" %}
 
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Admin</a></li>
+<li class="breadcrumb-item active">Painel de Compras</li>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
     <div>
-        <h2 class="mb-1">Central de Compras</h2>
-        <p class="mb-0 text-muted">Aprovação e recebimento de pedidos.</p>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('os.painel_estoque') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i> Estoque
-        </a>
+        <h2 class="mb-1">Gestão de Compras</h2>
+        <p class="mb-0 text-muted">Aprovação e acompanhamento de pedidos de reposição.</p>
     </div>
 </div>
 
-<ul class="nav nav-tabs nav-fill mb-4 border-bottom-0" id="comprasTab" role="tablist">
-    <li class="nav-item">
-        <button class="nav-link border-0 rounded-top active shadow-sm fw-bold bg-white" data-bs-toggle="tab"
-            data-bs-target="#pendentes">
-            <i class="bi bi-hourglass-split me-2 text-warning"></i> Pendentes
-        </button>
-    </li>
-    <li class="nav-item">
-        <button class="nav-link border-0 rounded-top" data-bs-toggle="tab" data-bs-target="#aguardando">
-            <i class="bi bi-truck me-2 text-primary"></i> A Receber
-        </button>
-    </li>
-    <li class="nav-item">
-        <button class="nav-link border-0 rounded-top" data-bs-toggle="tab" data-bs-target="#historico">
-            <i class="bi bi-check2-all me-2 text-success"></i> Histórico
-        </button>
-    </li>
-</ul>
-
-<div class="tab-content" id="comprasTabContent">
-    <!-- ABA PENDENTES -->
-    <div class="tab-pane fade show active" id="pendentes">
-        <div class="card border-0 shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4">Item</th>
-                            <th>Qtd Solic.</th>
-                            <th>Data</th>
-                            <th>Status Estimado</th>
-                            <th class="text-end pe-4">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in pendentes %}
-                        <tr>
-                            <td class="ps-4 fw-bold">
-                                {{ p.peca.nome }}
-                                <div class="small text-muted font-monospace">{{ p.peca.codigo }}</div>
-                            </td>
-                            <td>{{ "{:g}".format(p.quantidade) }} {{ p.peca.unidade_medida }}</td>
-                            <td>{{ p.data_solicitacao.strftime('%d/%m %H:%M') }}</td>
-                            <td>
-                                {% if p.peca.quantidade_atual <= p.peca.quantidade_minima %} <span
-                                    class="badge bg-danger bg-opacity-10 text-danger">Crítico</span>
-                                    {% else %}
-                                    <span class="badge bg-warning bg-opacity-10 text-warning">Reposição</span>
-                                    {% endif %}
-                            </td>
-                            <td class="text-end pe-4">
-                                <button class="btn btn-sm btn-success" onclick="aprovarPedido('{{ p.id }}')">
-                                    <i class="bi bi-check-lg"></i> Aprovar
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="rejeitarPedido('{{ p.id }}')">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">Nenhum pedido pendente.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pb-0">
+        <ul class="nav nav-tabs border-0" id="purchaseTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active fw-bold border-0 px-4 py-3" id="pendentes-tab" data-bs-toggle="tab"
+                    data-bs-target="#pendentes" type="button">
+                    <i class="bi bi-hourglass-split me-2"></i> Pendentes
+                    <span class="badge bg-danger ms-2">{{ pendentes|length }}</span>
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link fw-bold border-0 px-4 py-3" id="receber-tab" data-bs-toggle="tab"
+                    data-bs-target="#receber" type="button">
+                    <i class="bi bi-truck me-2"></i> A Receber
+                    <span class="badge bg-primary ms-2">{{ aprovados|length }}</span>
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link fw-bold border-0 px-4 py-3" id="historico-tab" data-bs-toggle="tab"
+                    data-bs-target="#historico" type="button">
+                    <i class="bi bi-clock-history me-2"></i> Histórico
+                </button>
+            </li>
+        </ul>
     </div>
-
-    <!-- ABA A RECEBER (APROVADOS) -->
-    <div class="tab-pane fade" id="aguardando">
-        <div class="card border-0 shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4">Pedido #</th>
-                            <th>Item</th>
-                            <th>Fornecedor</th>
-                            <th>Previsão</th>
-                            <th class="text-end pe-4">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in aprovados %}
-                        <tr>
-                            <td class="ps-4 text-muted">#{{ p.id }}</td>
-                            <td>{{ p.peca.nome }}</td>
-                            <td>{{ p.fornecedor.nome if p.fornecedor else 'A Definir' }}</td>
-                            <td>{{ p.data_chegada.strftime('%d/%m') if p.data_chegada else '-' }}</td>
-                            <td class="text-end pe-4">
-                                <button class="btn btn-sm btn-primary"
-                                    onclick="receberPedido('{{ p.id }}', '{{ p.peca.nome }}')">
-                                    <i class="bi bi-box-seam me-1"></i> Receber
-                                </button>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">Nenhum pedido aguardando entrega.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="card-body p-0">
+        <div class="tab-content" id="purchaseTabsContent">
+            <!-- ABA PENDENTES -->
+            <div class="tab-pane fade show active" id="pendentes" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Item / Código</th>
+                                <th>Quantidade</th>
+                                <th>Solicitado por</th>
+                                <th class="text-end pe-4">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pedido in pendentes %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold">{{ pedido.peca.nome }}</div>
+                                    <small class="text-muted font-monospace">{{ pedido.peca.codigo }}</small>
+                                </td>
+                                <td>
+                                    <span class="fw-bold fs-6">{{ "{:g}".format(pedido.quantidade|float) }}</span>
+                                    <small class="text-muted">{{ pedido.peca.unidade_medida }}</small>
+                                </td>
+                                <td>
+                                    <div>{{ pedido.data_solicitacao.strftime('%d/%m %H:%M') }}</div>
+                                    <small class="text-muted">{{ pedido.solicitante.nome if pedido.solicitante else
+                                        'N/A' }}</small>
+                                </td>
+                                <td>
+                                    {% if pedido.peca.quantidade_atual <= pedido.peca.quantidade_minima %} <span
+                                        class="badge bg-danger shadow-sm">CRÍTICO</span>
+                                        {% else %}
+                                        <span
+                                            class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">REPOSIÇÃO</span>
+                                        {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-success me-1"
+                                        onclick='abrirModalAprovar({{ pedido.id }}, {{ pedido.peca.nome|tojson }})'>
+                                        <i class="bi bi-check-lg me-1"></i> Aprovar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                        onclick="rejeitarPedido({{ pedido.id }})">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">Aguardando novas solicitações.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <!-- ABA HISTÓRICO -->
-    <div class="tab-pane fade" id="historico">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center text-muted py-5">
-                <i class="bi bi-archive fs-1 opacity-25"></i>
-                <p>Histórico de compras recentes aparecerá aqui.</p>
+            <!-- ABA A RECEBER -->
+            <div class="tab-pane fade" id="receber" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Pedido / Fornecedor</th>
+                                <th>Item / Qtd</th>
+                                <th>Auditoria</th>
+                                <th class="text-end pe-4">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pedido in aprovados %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold">#{{ pedido.id }} - {{ pedido.fornecedor.nome if
+                                        pedido.fornecedor else 'N/A' }}</div>
+                                    <small class="text-muted">{{ pedido.fornecedor.telefone if pedido.fornecedor else ''
+                                        }}</small>
+                                </td>
+                                <td>
+                                    <div>{{ pedido.peca.nome }}</div>
+                                    <small class="fw-bold">{{ "{:g}".format(pedido.quantidade|float) }} {{
+                                        pedido.peca.unidade_medida }}</small>
+                                </td>
+                                <td>
+                                    <div class="fw-bold">
+                                        <span
+                                            class="{% if pedido.data_chegada and pedido.data_chegada.date() < today %}text-danger{% endif %}">
+                                            {{ pedido.data_chegada.strftime('%d/%m/%Y') if pedido.data_chegada else
+                                            'N/A' }}
+                                        </span>
+                                    </div>
+                                    <small class="text-muted">Status: {{ pedido.status|capitalize }}</small>
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        <span class="text-muted">Por:</span> {{ pedido.solicitante.nome if
+                                        pedido.solicitante else 'N/A' }}
+                                    </div>
+                                    <div class="small">
+                                        <span class="text-muted">Aprov:</span> {{ pedido.aprovador.nome if
+                                        pedido.aprovador else 'N/A' }}
+                                    </div>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-primary"
+                                        onclick='receberPedido({{ pedido.id }}, {{ pedido.peca.nome|tojson }}, "{{ pedido.quantidade }} {{ pedido.peca.unidade_medida }}")'>
+                                        <i class="bi bi-box-seam me-1"></i> Receber
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">Nenhum pedido em trânsito.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ABA HISTÓRICO -->
+            <div class="tab-pane fade" id="historico" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Item / Fornecedor</th>
+                                <th>Qtd / Valor</th>
+                                <th>Solicitado em</th>
+                                <th>Finalizado em</th>
+                                <th class="pe-4">Auditoria</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pedido in historico %}
+                            <tr class="{% if pedido.status == 'cancelado' %}opacity-75{% endif %}">
+                                <td class="ps-4">
+                                    <div class="fw-bold">{{ pedido.peca.nome }}</div>
+                                    <small class="text-muted">{{ pedido.fornecedor.nome if pedido.fornecedor else 'N/A'
+                                        }}</small>
+                                </td>
+                                <td>
+                                    <div class="fw-bold">{{ "{:g}".format(pedido.quantidade|float) }}</div>
+                                    <small class="text-muted">R$ {{ "{:.2f}".format(pedido.valor_total if
+                                        pedido.valor_total is defined else 0) }}</small>
+                                </td>
+                                <td>{{ pedido.data_solicitacao.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    <div class="fw-bold">{{ pedido.data_chegada.strftime('%d/%m/%Y') if
+                                        pedido.data_chegada else '-' }}</div>
+                                    <div class="small">
+                                        {% if pedido.status == 'entregue' %}
+                                        <span class="text-success">ENTREGUE</span>
+                                        {% else %}
+                                        <span class="text-danger">CANCELADO</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="pe-4">
+                                    <div class="small"><span class="text-muted">Ped:</span> {{
+                                        pedido.solicitante.nome|default('N/A') }}</div>
+                                    <div class="small"><span class="text-muted">Apr:</span> {{
+                                        pedido.aprovador.nome|default('N/A') }}</div>
+                                    <div class="small"><span class="text-muted">Rec:</span> {{
+                                        pedido.recebedor.nome|default('N/A') }}</div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Aprovar -->
+<!-- MODAL APROVAÇÃO -->
 <div class="modal fade" id="modalAprovar" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Aprovar Compra</h5>
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Aprovar Compra</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p>Selecione o fornecedor para este pedido:</p>
+            <div class="modal-body pt-4">
+                <div class="alert alert-info py-2 small border-0">
+                    <i class="bi bi-info-circle me-2"></i> Selecione o fornecedor para calcular a previsão.
+                </div>
                 <form id="formAprovar">
-                    <input type="hidden" id="idPedidoAprovar">
+                    <input type="hidden" id="aprovarPedidoId">
+                    <div class="mb-3">
+                        <label class="form-label">Item</label>
+                        <input type="text" class="form-control bg-light" id="aprovarNomeItem" readonly>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Fornecedor</label>
-                        <select id="selectFornecedor" class="form-select" required>
-                            {% for f in fornecedores %}
-                            <option value="{{ f.id }}">{{ f.nome }} (Prazo: {{ f.prazo_medio_entrega_dias|int }}d)
+                        <select id="fornecedorId" class="form-select" required onchange="atualizarDataPrevisao()">
+                            <option value="" disabled selected>Escolha um fornecedor...</option>
+                            {% for forn in fornecedores|sort(attribute='prazo_medio_entrega_dias') %}
+                            <option value="{{ forn.id }}" data-prazo="{{ forn.prazo_medio_entrega_dias }}">
+                                {{ forn.nome }} ({{ forn.prazo_medio_entrega_dias|int }} dias | {{
+                                forn.total_pedidos_entregues }} envios)
                             </option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Previsão Chegada</label>
-                        <input type="date" id="dataChegada" class="form-control">
+                    <div class="mb-4">
+                        <label class="form-label">Previsão de Chegada</label>
+                        <input type="date" id="dataChegada" class="form-control" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="button" onclick="confirmarAprovacao()" class="btn btn-success fw-bold py-2">
+                            Aprovar e Gerar Pedido
+                        </button>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-success" onclick="confirmarAprovacao()">Confirmar Pedido</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL RECEBIMENTO (PROMPT 4) -->
+<div class="modal fade" id="modalReceber" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Confirmar Recebimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <div class="alert alert-warning py-2 small border-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i> <strong>RN026:</strong> O recebimento é irreversível
+                    e atualizará o estoque imediatamente.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small mb-1">Resumo do Pedido</label>
+                    <div class="p-3 bg-light rounded border">
+                        <div class="fw-bold" id="receberResumoItem"></div>
+                        <div class="small text-muted" id="receberResumoQtd"></div>
+                    </div>
+                    <input type="hidden" id="receberPedidoId">
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Unidade de Destino</label>
+                    <select id="unidadeDestinoId" class="form-select">
+                        {% for unidade in unidades %}
+                        <option value="{{ unidade.id }}" {% if current_user.unidade_padrao_id==unidade.id %}selected{%
+                            endif %}>
+                            {{ unidade.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">A quantidade será adicionada ao saldo desta unidade.</small>
+                </div>
+                <div class="d-grid">
+                    <button type="button" id="btnConfirmarRecebimento" onclick="confirmarRecebimento()"
+                        class="btn btn-primary fw-bold py-2">
+                        <i class="bi bi-box-seam me-2"></i> Confirmar Entrada no Estoque
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    const modalAprovar = new bootstrap.Modal(document.getElementById('modalAprovar'));
+    let modalAprovar;
+    let modalReceber;
 
-    function aprovarPedido(id) {
-        document.getElementById('idPedidoAprovar').value = id;
+    document.addEventListener('DOMContentLoaded', () => {
+        modalAprovar = new bootstrap.Modal(document.getElementById('modalAprovar'));
+        modalReceber = new bootstrap.Modal(document.getElementById('modalReceber'));
+    });
+
+    function abrirModalAprovar(id, nome) {
+        document.getElementById('aprovarPedidoId').value = id;
+        document.getElementById('aprovarNomeItem').value = nome;
+        document.getElementById('formAprovar').reset();
         modalAprovar.show();
     }
 
-    function confirmarAprovacao() {
-        const id = document.getElementById('idPedidoAprovar').value;
-        const fornId = document.getElementById('selectFornecedor').value;
-        const data = document.getElementById('dataChegada').value;
+    function atualizarDataPrevisao() {
+        const select = document.getElementById('fornecedorId');
+        const option = select.options[select.selectedIndex];
+        const prazo = parseInt(option.dataset.prazo || 0);
 
-        fetch(`/api/compras/${id}/aprovar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fornecedor_id: fornId, data_chegada: data })
-        }).then(res => res.json())
-            .then(data => {
-                if (data.success) location.reload();
-                else ToastModule.show("Erro: " + data.erro, 'danger');
-            });
-    }
-
-    function receberPedido(id, nome) {
-        if (confirm(`Confirmar recebimento de ${nome}? Isso irá adicionar ao saldo do estoque.`)) {
-            fetch(`/api/compras/${id}/receber`, { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        ToastModule.show("Itens recebidos!", 'success');
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        ToastModule.show("Erro: " + data.erro, 'danger');
-                    }
-                });
+        if (prazo > 0) {
+            const data = new Date();
+            data.setDate(data.getDate() + prazo);
+            document.getElementById('dataChegada').value = data.toISOString().split('T')[0];
         }
     }
 
-    function rejeitarPedido(id) {
-        if (confirm("Deseja rejeitar este pedido?")) {
-            fetch(`/api/compras/${id}/rejeitar`, { method: 'POST' })
-                .then(res => res.json())
-                .then(data => location.reload());
+    async function confirmarAprovacao() {
+        const id = document.getElementById('aprovarPedidoId').value;
+        const fornecedorId = document.getElementById('fornecedorId').value;
+        const dataChegada = document.getElementById('dataChegada').value;
+
+        if (!fornecedorId || !dataChegada) {
+            ToastModule.show("Preencha todos os campos.", "warning");
+            return;
+        }
+
+        try {
+            const res = await fetch(`/admin/api/compras/${id}/aprovar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fornecedor_id: fornecedorId,
+                    data_chegada: dataChegada
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                ToastModule.show("Pedido aprovado com sucesso!", "success");
+                modalAprovar.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                ToastModule.show("Erro: " + data.erro, "danger");
+            }
+        } catch (e) {
+            ToastModule.show("Erro de conexão.", "danger");
+        }
+    }
+
+    async function rejeitarPedido(id) {
+        if (!confirm("Deseja realmente cancelar este pedido?")) return;
+
+        try {
+            const res = await fetch(`/admin/api/compras/${id}/rejeitar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                ToastModule.show("Pedido cancelado.", "info");
+                setTimeout(() => location.reload(), 500);
+            }
+        } catch (e) {
+            ToastModule.show("Erro ao cancelar.", "danger");
+        }
+    }
+
+    function receberPedido(id, nome, qtd) {
+        document.getElementById('receberPedidoId').value = id;
+        document.getElementById('receberResumoItem').innerText = `Pedido #${id} - ${nome}`;
+        document.getElementById('receberResumoQtd').innerText = `Quantidade: ${qtd}`;
+        modalReceber.show();
+    }
+
+    async function confirmarRecebimento() {
+        const id = document.getElementById('receberPedidoId').value;
+        const unidadeId = document.getElementById('unidadeDestinoId').value;
+        const btn = document.getElementById('btnConfirmarRecebimento');
+
+        if (!id || !unidadeId) {
+            ToastModule.show("Erro ao identificar pedido ou unidade.", "danger");
+            return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Processando...';
+
+        try {
+            const res = await fetch(`/admin/api/compras/${id}/receber`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unidade_destino_id: unidadeId })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                ToastModule.show("Estoque atualizado com sucesso!", "success");
+                modalReceber.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                ToastModule.show("Erro: " + data.erro, "danger");
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        } catch (e) {
+            ToastModule.show("Erro de conexão.", "danger");
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     }
 </script>
+
+<style>
+    .nav-tabs .nav-link {
+        color: #6c757d;
+        transition: all 0.3s ease;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom: 2px solid #0d6efd !important;
+    }
+
+    .nav-tabs .nav-link:hover:not(.active) {
+        background-color: #f8f9fa;
+    }
+</style>
 {% endblock %}

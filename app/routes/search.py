@@ -1,5 +1,5 @@
-from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask import Blueprint, jsonify, request, url_for
+from flask_login import login_required, current_user
 from app.models.models import Usuario
 from app.models.estoque_models import OrdemServico, Equipamento, Estoque, Fornecedor
 from app.models.terceirizados_models import Terceirizado
@@ -24,7 +24,7 @@ def global_search():
                 'id': os_por_id.id,
                 'titulo': f'OS #{os_por_id.numero_os} - {os_por_id.equipamento_rel.nome if os_por_id.equipamento_rel else "Sem Equipamento"}',
                 'subtitulo': f'Status: {os_por_id.status} | Técnico: {os_por_id.tecnico.nome}',
-                'url': f'/os/{os_por_id.id}/detalhes',
+                'url': url_for('os.detalhes', id=os_por_id.id), # Corrigido com url_for
                 'tipo': 'Ordem de Serviço'
             })
 
@@ -43,7 +43,7 @@ def global_search():
                 'id': os.id,
                 'titulo': f'OS #{os.numero_os} - {os.equipamento_rel.nome if os.equipamento_rel else "Geral"}',
                 'subtitulo': f'{os.descricao_problema[:50]}...',
-                'url': f'/os/{os.id}/detalhes',
+                'url': url_for('os.detalhes', id=os.id), # Corrigido com url_for
                 'tipo': 'Ordem de Serviço'
             })
 
@@ -55,15 +55,18 @@ def global_search():
         )
     ).limit(5).all()
     
+    # Link para Admin se for admin, senão sem link ou link visualização
+    equip_url = url_for('admin.dashboard', tab='equipamentos') if current_user.tipo == 'admin' else '#'
+    
     equip_results = [{
         'id': e.id,
         'titulo': e.nome,
         'subtitulo': f'Categoria: {e.categoria} | Unidade: {e.unidade.nome}',
-        'url': f'/admin/configuracoes?tab=equipamentos', # Link genérico pois não há pg detalhe
+        'url': equip_url,
         'tipo': 'Equipamento'
     } for e in equipamentos]
 
-    # 3. Buscar Peças (Estoque)
+    # 3. Buscar Peças (Estoque) - [CORREÇÃO PRINCIPAL]
     pecas = Estoque.query.filter(
         or_(
             Estoque.nome.ilike(f'%{query}%'),
@@ -75,7 +78,7 @@ def global_search():
         'id': p.id,
         'titulo': f'{p.nome} ({p.codigo})',
         'subtitulo': f'Saldo: {p.quantidade_atual} {p.unidade_medida}',
-        'url': '/os/painel-estoque', 
+        'url': url_for('os.painel_estoque'), # Rota correta: /os/estoque/painel
         'tipo': 'Peça'
     } for p in pecas]
 
@@ -87,11 +90,14 @@ def global_search():
         )
     ).limit(3).all()
     
+    # Se não for admin, fornecedor pode não ter link acessível, ou direcionar para lista de compras se houver
+    forn_url = url_for('admin.dashboard', tab='fornecedores') if current_user.tipo == 'admin' else '#'
+
     forn_results = [{
         'id': f.id,
         'titulo': f.nome,
         'subtitulo': f'Fornecedor | {f.email}',
-        'url': '/admin/configuracoes?tab=modalFornecedor', # Tentar abrir modal?
+        'url': forn_url,
         'tipo': 'Fornecedor'
     } for f in fornecedores]
     
@@ -104,21 +110,27 @@ def global_search():
         )
     ).limit(3).all()
     
+    # Aponta para a lista de tarefas externas (chamados) que é acessível a todos
+    terc_url = url_for('terceirizados.listar_chamados')
+    
     terc_results = [{
         'id': t.id,
         'titulo': t.nome_empresa or t.nome,
         'subtitulo': f'Terceirizado | {t.especialidades[:30] if t.especialidades else "Geral"}',
-        'url': '/terceirizados/painel', 
+        'url': terc_url,
         'tipo': 'Terceirizado'
     } for t in terceiros]
 
     # 6. Buscar Técnicos/Usuários
     usuarios = Usuario.query.filter(Usuario.nome.ilike(f'%{query}%')).limit(3).all()
+    
+    user_url = url_for('admin.dashboard', tab='tecnicos') if current_user.tipo == 'admin' else '#'
+
     user_results = [{
         'id': u.id,
         'titulo': u.nome,
         'subtitulo': f'{u.tipo.capitalize()} | {u.email}',
-        'url': '/admin/configuracoes?tab=tecnicos',
+        'url': user_url,
         'tipo': 'Usuário'
     } for u in usuarios]
 

@@ -168,14 +168,23 @@ class SolicitacaoTransferencia(db.Model):
 class PedidoCompra(db.Model):
     __tablename__ = 'pedidos_compra'
     id = db.Column(db.Integer, primary_key=True)
-    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedores.id'), nullable=False)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedores.id'), nullable=True)
     estoque_id = db.Column(db.Integer, db.ForeignKey('estoque.id'), nullable=False)
     quantidade = db.Column(db.Numeric(10, 3), nullable=False)
     data_solicitacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_chegada = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='pendente')
+    
+    # Audit fields
+    solicitante_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    aprovador_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    recebedor_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+
     fornecedor = db.relationship('Fornecedor', backref='pedidos')
     peca = db.relationship('Estoque')
+    solicitante = db.relationship('Usuario', foreign_keys=[solicitante_id])
+    aprovador = db.relationship('Usuario', foreign_keys=[aprovador_id])
+    recebedor = db.relationship('Usuario', foreign_keys=[recebedor_id])
 
 class MovimentacaoEstoque(db.Model):
     __tablename__ = 'movimentacoes_estoque'

@@ -268,6 +268,64 @@
     </div>
 </div>
 
+<!-- Modal Transferência (Prompt 5) -->
+<div class="modal fade" id="modalTransferencia" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Solicitar Transferência</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <form id="formTransferencia" onsubmit="event.preventDefault(); confirmarTransferencia();">
+                    <input type="hidden" id="transfEstoqueId">
+                    <input type="hidden" id="transfDestinoId">
+
+                    <div class="mb-3">
+                        <label class="form-label">Item</label>
+                        <input type="text" class="form-control bg-light" id="transfNomeItem" readonly>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Unidade Origem (onde há saldo)</label>
+                            <select id="transfOrigemId" class="form-select" required>
+                                <option value="" disabled selected>Selecione a origem...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Unidade Destino</label>
+                        <input type="text" class="form-control bg-light" id="transfDestinoNome" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Quantidade</label>
+                        <input type="number" step="0.01" class="form-control form-control-lg" id="transfQtd" required>
+                    </div>
+
+                    <div class="alert alert-info py-2 small border-0 mb-3">
+                        {% if current_user.tipo in ['admin', 'gerente'] %}
+                        <i class="bi bi-lightning-fill me-1"></i> Esta transferência será executada
+                        <strong>imediatamente</strong>.
+                        {% else %}
+                        <i class="bi bi-hourglass-split me-1"></i> Esta solicitação será enviada para
+                        <strong>aprovação</strong>.
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary" id="btnSalvarTransf">
+                            Confirmar Transferência
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Adicionar Recursos (Peça ou Serviço) -->
 <div class="modal fade" id="modalRecursos" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -501,25 +559,35 @@
                 ToastModule.show(data.mensagem || "Peça adicionada com sucesso!", "success");
                 setTimeout(() => location.reload(), 1000);
             } else {
-                // 1. Detectar erro de "Estoque insuficiente"
-                if (data.erro && data.erro.toLowerCase().includes("insuficiente")) {
+                const erro = data.erro;
 
-                    // 2. Exibir Toast com botão de ação (HTML injetado)
-                    const actionBtn = `
-                        <div class="mt-2 d-grid gap-2">
-                            <button class="btn btn-sm btn-primary text-white fw-bold" 
-                                    onclick="prepararSolicitacaoCompra('${id}', '${nomePeca.innerText}', '${qtd}')">
-                                <i class="bi bi-cart-plus me-1"></i> Solicitar Compra
-                            </button>
-                            <button class="btn btn-sm btn-light border shadow-sm text-secondary small" 
-                                    onclick="abrirModalEntradaContexto('${id}', '${nomePeca.innerText}')">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Entrada Manual
-                            </button>
-                        </div>`;
+                if (erro.includes("Solicite transferência")) {
+                    const actionHTML = `
+                        <button onclick='abrirTransferenciaContexto(${JSON.stringify(data)})' 
+                                class="btn btn-sm btn-primary fw-bold text-white mt-2 w-100">
+                            <i class="bi bi-arrow-left-right me-1"></i> Solicitar Transferência
+                        </button>
+                    `;
+                    ToastModule.show(erro + actionHTML, 'warning', true);
+                }
+                else if (erro.includes("Solicite compra")) {
+                    const actionHTML = `
+                        <button onclick='abrirCompraContexto(${JSON.stringify(data)})' 
+                                class="btn btn-sm btn-danger fw-bold mt-2 w-100">
+                            <i class="bi bi-cart-plus me-1"></i> Solicitar Compra
+                        </button>
+                    `;
+                    ToastModule.show(erro + actionHTML, 'danger', true);
+                }
+                else {
+                    ToastModule.show(erro, 'danger');
+                }
 
-                    ToastModule.show(`<div>${data.erro}</div>${actionBtn}`, 'warning');
-                } else {
-                    ToastModule.show("Erro: " + data.erro, 'danger');
+                // Fecha o modal de recursos para o usuário ver o Toast/Ação se necessário
+                // Ou mantém aberto? O prompt diz "Toast deve ser persistente", mas não fala do modal.
+                // Vou fechar o modal de recursos se houver ação para não sobrepor.
+                if (erro.includes("Solicite")) {
+                    bootstrap.Modal.getInstance(document.getElementById('modalRecursos')).hide();
                 }
             }
         } catch (e) {
@@ -617,6 +685,88 @@
         }
     }
 
+    function abrirTransferenciaContexto(data) {
+        // Remove o toast antes de abrir o modal
+        const toasts = document.querySelectorAll('.gmm-toast.warning');
+        toasts.forEach(t => {
+            if (t.innerHTML.includes('Solicite transferência')) ToastModule.remove(t);
+        });
+
+        document.getElementById('transfEstoqueId').value = idPecaField.value;
+        document.getElementById('transfNomeItem').value = nomePeca.innerText;
+        document.getElementById('transfDestinoId').value = data.unidade_destino_id;
+        document.getElementById('transfDestinoNome').value = data.unidade_destino_nome;
+        document.getElementById('transfQtd').value = qtdField.value;
+
+        const selectOrigem = document.getElementById('transfOrigemId');
+        selectOrigem.innerHTML = '<option value="" disabled selected>Selecione a origem...</option>';
+
+        if (data.sugestoes_transferencia) {
+            data.sugestoes_transferencia.forEach(suge => {
+                const opt = document.createElement('option');
+                opt.value = suge.unidade_id;
+                opt.innerText = `${suge.unidade_nome} (Saldo: ${suge.saldo})`;
+                selectOrigem.appendChild(opt);
+            });
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('modalTransferencia'));
+        modal.show();
+    }
+
+    function abrirCompraContexto(data) {
+        // Remove o toast
+        const toasts = document.querySelectorAll('.gmm-toast.danger');
+        toasts.forEach(t => {
+            if (t.innerHTML.includes('Solicite compra')) ToastModule.remove(t);
+        });
+
+        prepararSolicitacaoCompra(idPecaField.value, nomePeca.innerText, qtdField.value);
+    }
+
+    function prepararTransferencia(data) {
+        // Alias para a função solicitada no Prompt 6 se necessário, mas vou usar abrirTransferenciaContexto
+        abrirTransferenciaContexto(data);
+    }
+
+    async function confirmarTransferencia() {
+        const payload = {
+            estoque_id: document.getElementById('transfEstoqueId').value,
+            unidade_origem_id: document.getElementById('transfOrigemId').value,
+            unidade_destino_id: document.getElementById('transfDestinoId').value,
+            quantidade: document.getElementById('transfQtd').value,
+            observacao: `Necessidade para OS #{{ os.numero_os }}`
+        };
+
+        const btn = document.getElementById('btnSalvarTransf');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Processando...';
+
+        try {
+            const res = await fetch('/os/api/estoque/transferir', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                ToastModule.show(data.msg, "success");
+                bootstrap.Modal.getInstance(document.getElementById('modalTransferencia')).hide();
+                const modalRecursos = bootstrap.Modal.getInstance(document.getElementById('modalRecursos'));
+                if (modalRecursos) modalRecursos.hide();
+            } else {
+                ToastModule.show("Erro: " + data.erro, "danger");
+            }
+        } catch (e) {
+            ToastModule.show("Erro de conexão.", "danger");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
     function solicitarCompraPeca() {
         // Atalho usado pelo botão no card de ação (quando estoque é 0)
         const id = idPecaField.value;
@@ -632,4 +782,44 @@
         }
     });
 </script>
+
+<div class="modal fade" id="modalEditarOS" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Editar Ordem de Serviço</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('os.editar_os', id=os.id) }}" method="POST">
+                <div class="modal-body pt-4">
+                    <div class="mb-3">
+                        <label class="form-label">Prioridade</label>
+                        <select name="prioridade" class="form-select">
+                            <option value="baixa" {% if os.prioridade=='baixa' %}selected{% endif %}>Baixa</option>
+                            <option value="media" {% if os.prioridade=='media' %}selected{% endif %}>Média</option>
+                            <option value="alta" {% if os.prioridade=='alta' %}selected{% endif %}>Alta</option>
+                            <option value="urgente" {% if os.prioridade=='urgente' %}selected{% endif %}>Urgente
+                            </option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Prazo Limite</label>
+                        <input type="datetime-local" name="prazo_conclusao" class="form-control"
+                            value="{{ os.prazo_conclusao.strftime('%Y-%m-%dT%H:%M') if os.prazo_conclusao else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição do Problema</label>
+                        <textarea name="descricao_problema" class="form-control"
+                            rows="4">{{ os.descricao_problema }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
