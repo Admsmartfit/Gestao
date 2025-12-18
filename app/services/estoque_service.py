@@ -66,8 +66,7 @@ class EstoqueService:
         return item.quantidade_atual, alerta
 
     @staticmethod
-    def repor_estoque(estoque_id, quantidade, usuario_id, motivo=None, unidade_id=None):
-        # ... (Manter o código existente do método repor_estoque)
+    def repor_estoque(estoque_id, quantidade, usuario_id, motivo=None, unidade_id=None, valor_novo=None):
         item = Estoque.query.get(estoque_id)
         if not item:
             raise ValueError("Item não encontrado")
@@ -82,6 +81,10 @@ class EstoqueService:
         qtd_decimal = Decimal(str(quantidade))
         if qtd_decimal <= 0:
             raise ValueError("A quantidade deve ser maior que zero.")
+
+        # Se valor_novo informado, atualizar Estoque.valor_unitario
+        if valor_novo is not None:
+            item.valor_unitario = Decimal(str(valor_novo))
 
         saldo_local = EstoqueSaldo.query.filter_by(estoque_id=estoque_id, unidade_id=unidade_id).first()
         
@@ -102,6 +105,9 @@ class EstoqueService:
 
         db.session.add(mov)
         db.session.commit()
+        
+        # Refresh item instance to get updated quantity_atual from event
+        db.session.refresh(item)
         
         return item.quantidade_atual
 

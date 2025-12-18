@@ -239,6 +239,35 @@
     </div>
 </div>
 
+<!-- Modal Solicitar Compra -->
+<div class="modal fade" id="modalSolicitarCompra" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Solicitar Compra de Peça</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <div class="mb-3">
+                    <label class="form-label">Item</label>
+                    <input type="text" class="form-control bg-light" id="compraNomeItem" readonly>
+                    <input type="hidden" id="compraIdItem">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantidade Necessária</label>
+                    <input type="number" step="0.01" class="form-control form-control-lg" id="compraQtd" required>
+                </div>
+                <div class="d-grid mt-4">
+                    <button type="button" onclick="confirmarSolicitacaoCompra()" class="btn btn-danger"
+                        id="btnConfirmarCompra">
+                        Confirmar Solicitação
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Adicionar Recursos (Peça ou Serviço) -->
 <div class="modal fade" id="modalRecursos" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -477,10 +506,14 @@
 
                     // 2. Exibir Toast com botão de ação (HTML injetado)
                     const actionBtn = `
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-light border shadow-sm text-primary fw-bold w-100" 
+                        <div class="mt-2 d-grid gap-2">
+                            <button class="btn btn-sm btn-primary text-white fw-bold" 
+                                    onclick="prepararSolicitacaoCompra('${id}', '${nomePeca.innerText}', '${qtd}')">
+                                <i class="bi bi-cart-plus me-1"></i> Solicitar Compra
+                            </button>
+                            <button class="btn btn-sm btn-light border shadow-sm text-secondary small" 
                                     onclick="abrirModalEntradaContexto('${id}', '${nomePeca.innerText}')">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Solicitar Entrada
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Entrada Manual
                             </button>
                         </div>`;
 
@@ -536,30 +569,60 @@
         }
     }
 
-    async function solicitarCompraPeca() {
-        const id = idPecaField.value;
-        const qtd = qtdField.value;
-        if (!id || !qtd) return;
+    function prepararSolicitacaoCompra(id, nome, qtd = 1) {
+        document.getElementById('compraIdItem').value = id;
+        document.getElementById('compraNomeItem').value = nome;
+        document.getElementById('compraQtd').value = qtd;
 
-        // Poderia abrir um prompt para observação/motivo
+        const modal = new bootstrap.Modal(document.getElementById('modalSolicitarCompra'));
+        modal.show();
+    }
 
-        const payload = { estoque_id: id, quantidade: qtd };
+    async function confirmarSolicitacaoCompra() {
+        const id = document.getElementById('compraIdItem').value;
+        const qtd = document.getElementById('compraQtd').value;
+        const btn = document.getElementById('btnConfirmarCompra');
+
+        if (!qtd || qtd <= 0) {
+            ToastModule.show("Informe uma quantidade válida.", "warning");
+            return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Solicitando...';
+
         try {
             const res = await fetch(`/os/{{ os.id }}/solicitar-compra-peca`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ estoque_id: id, quantidade: qtd })
             });
             const data = await res.json();
+
             if (data.success) {
-                alert(data.mensagem);
-                location.reload();
+                ToastModule.show(data.mensagem, "success");
+                bootstrap.Modal.getInstance(document.getElementById('modalSolicitarCompra')).hide();
+                // Opcional: fechar também o modal de recursos se estiver aberto
+                const modalRecursos = bootstrap.Modal.getInstance(document.getElementById('modalRecursos'));
+                if (modalRecursos) modalRecursos.hide();
             } else {
-                alert('Erro: ' + data.erro);
+                ToastModule.show("Erro: " + data.erro, "danger");
             }
         } catch (e) {
-            alert('Erro de conexão');
+            ToastModule.show("Erro de conexão.", "danger");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
+    }
+
+    function solicitarCompraPeca() {
+        // Atalho usado pelo botão no card de ação (quando estoque é 0)
+        const id = idPecaField.value;
+        const nome = nomePeca.innerText;
+        const qtd = qtdField.value;
+        prepararSolicitacaoCompra(id, nome, qtd);
     }
 
     // Fecha a lista se clicar fora

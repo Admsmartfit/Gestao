@@ -143,16 +143,24 @@ def solicitar_compra_peca(id):
         estoque_id = data.get('estoque_id')
         quantidade = data.get('quantidade')
         
-        # Pega o primeiro fornecedor vinculado à peça no catalogo ou um 'Fornecedor Geral'
+        if not estoque_id or not quantidade or float(quantidade) <= 0:
+            return jsonify({'success': False, 'erro': 'Quantidade deve ser maior que zero.'}), 400
+
+        item = Estoque.query.get(estoque_id)
+        if not item:
+            return jsonify({'success': False, 'erro': 'Item não encontrado.'}), 404
+
         from app.models.estoque_models import CatalogoFornecedor, Fornecedor
         
+        # 1. Tenta buscar no catálogo vinculado
         cat = CatalogoFornecedor.query.filter_by(estoque_id=estoque_id).first()
         if cat:
             fornecedor_id = cat.fornecedor_id
         else:
+            # 2. Tenta buscar qualquer fornecedor disponível
             f = Fornecedor.query.first()
             if not f:
-                return jsonify({'success': False, 'erro': 'Nenhum fornecedor cadastrado.'}), 400
+                return jsonify({'success': False, 'erro': 'Nenhum fornecedor cadastrado no sistema.'}), 400
             fornecedor_id = f.id
 
         novo_pedido = PedidoCompra(
@@ -189,7 +197,9 @@ def entrada_estoque():
             estoque_id=data['estoque_id'],
             quantidade=data['quantidade'],
             usuario_id=current_user.id,
-            motivo=data.get('motivo')
+            motivo=data.get('motivo'),
+            unidade_id=data.get('unidade_id'),
+            valor_novo=data.get('valor_novo')
         )
         return jsonify({'success': True, 'novo_saldo': float(novo_saldo)})
     except Exception as e:
@@ -238,39 +248,43 @@ def solicitar_compra():
     data = request.get_json()
     try:
         estoque_id = data.get('estoque_id')
-        qtd = float(data.get('quantidade', 1))
+        quantidade = data.get('quantidade')
         
-        # Cria pedido pendente (sem fornecedor ainda)
+        if not estoque_id or not quantidade or float(quantidade) <= 0:
+            return jsonify({'success': False, 'erro': 'Quantidade deve ser maior que zero.'}), 400
+
+        item = Estoque.query.get(estoque_id)
+        if not item:
+            return jsonify({'success': False, 'erro': 'Item não encontrado.'}), 404
+
+        from app.models.estoque_models import CatalogoFornecedor, Fornecedor
+        
+        # 1. Tenta buscar no catálogo vinculado
+        vinculo = CatalogoFornecedor.query.filter_by(estoque_id=estoque_id).first()
+        if vinculo:
+            fornecedor_id = vinculo.fornecedor_id
+        else:
+            # 2. Tenta buscar qualquer fornecedor disponível
+            primeiro_forn = Fornecedor.query.first()
+            if primeiro_forn:
+                fornecedor_id = primeiro_forn.id
+            else:
+                return jsonify({'success': False, 'erro': 'Nenhum fornecedor cadastrado no sistema.'}), 400
+
         pedido = PedidoCompra(
             estoque_id=estoque_id,
-            fornecedor_id=None, # Será definido na aprovação ou via regra de negócio
-            quantidade=qtd,
+            fornecedor_id=fornecedor_id,
+            quantidade=quantidade,
             status='pendente',
             data_solicitacao=datetime.utcnow()
         )
-        # Hack: PedidoCompra obriga fornecedor_id NOT NULL na definição original?
-        # Se sim, precisamos buscar o principal ou permitir nulo.
-        # Verificando model: fornecedor_id = db.Column(..., nullable=False)
-        # Solução: Buscar o primeiro fornecedor vinculado ou um "Fornecedor Padrão"
-        # Se não houver, vai dar erro. Vamos pegar o primeiro vinculo do catalogo.
-        from app.models.estoque_models import CatalogoFornecedor
-        vinculo = CatalogoFornecedor.query.filter_by(estoque_id=estoque_id).first()
-        if vinculo:
-            pedido.fornecedor_id = vinculo.fornecedor_id
-        else:
-            # Tenta pegar qualquer fornecedor ou um placeholder se existir
-            # Para evitar erro 500 agora, vamos assumir que o sistema exige vinculo prévio
-            # Ou vamos relaxar a constraint? Não posso mudar o DB agora sem migração.
-            # Vou buscar o primeiro fornecedor da base.
-            primeiro_forn = Fornecedor.query.first()
-            if primeiro_forn:
-                pedido.fornecedor_id = primeiro_forn.id
-            else:
-                return jsonify({'success': False, 'erro': 'Nenhum fornecedor cadastrado no sistema para vincular.'}), 400
 
         db.session.add(pedido)
         db.session.commit()
-        return jsonify({'success': True, 'msg': 'Solicitação de compra criada!'})
+        return jsonify({
+            'success': True, 
+            'mensagem': f'Solicitação de compra criada! (Pedido #{pedido.id})'
+        })
     except Exception as e:
         return jsonify({'success': False, 'erro': str(e)}), 400
 

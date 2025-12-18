@@ -89,7 +89,7 @@
                                 class="d-flex align-items-center gap-2">
                                 <span class="badge bg-danger text-white shadow-sm shimmer">BAIXO</span>
                                 <button class="btn btn-xs btn-danger btn-sm-custom ms-2 fade-in"
-                                    onclick="solicitarCompraItem('{{ item.id }}', '{{ item.nome }}')">
+                                    onclick="solicitarCompraItem('{{ item.id }}', '{{ item.nome }}', '{{ item.quantidade_minima }}')">
                                     <i class="bi bi-cart-plus"></i> Comprar
                                 </button>
         </div>
@@ -195,6 +195,34 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSolicitarCompra" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Solicitar Compra de Peça</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <div class="mb-3">
+                    <label class="form-label">Item</label>
+                    <input type="text" class="form-control bg-light" id="compraNomeItem" readonly>
+                    <input type="hidden" id="compraIdItem">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantidade para Reposição</label>
+                    <input type="number" step="0.01" class="form-control form-control-lg" id="compraQtd" required>
+                </div>
+                <div class="d-grid mt-4">
+                    <button type="button" onclick="confirmarSolicitacaoCompra()" class="btn btn-danger"
+                        id="btnConfirmarCompra">
+                        Confirmar Solicitação
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -457,10 +485,49 @@
             });
     }
 
-    function solicitarCompraItem(id, nome) {
-        // Placeholder para futura implementação de requisição formal
-        if (confirm(`Solicitar compra urgente para: ${nome}?`)) {
-            ToastModule.show("Solicitação enviada ao setor de compras.", "success");
+    function solicitarCompraItem(id, nome, qtdMinima = 5) {
+        document.getElementById('compraIdItem').value = id;
+        document.getElementById('compraNomeItem').value = nome;
+        document.getElementById('compraQtd').value = qtdMinima;
+
+        new bootstrap.Modal(document.getElementById('modalSolicitarCompra')).show();
+    }
+
+    async function confirmarSolicitacaoCompra() {
+        const id = document.getElementById('compraIdItem').value;
+        const qtd = document.getElementById('compraQtd').value;
+        const btn = document.getElementById('btnConfirmarCompra');
+
+        if (!qtd || qtd <= 0) {
+            ToastModule.show("Informe uma quantidade válida.", "warning");
+            return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Solicitando...';
+
+        try {
+            const res = await fetch(`/os/api/estoque/solicitar-compra`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estoque_id: id, quantidade: qtd })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                ToastModule.show(data.mensagem || "Solicitação enviada!", "success");
+                bootstrap.Modal.getInstance(document.getElementById('modalSolicitarCompra')).hide();
+                // A página será recarregada para mostrar o pedido? O PRD não pede explicitamente,
+                // mas é boa prática. Aqui vou apenas fechar e talvez atualizar o status se houvesse UI para isso.
+            } else {
+                ToastModule.show("Erro: " + data.erro, "danger");
+            }
+        } catch (e) {
+            ToastModule.show("Erro de conexão.", "danger");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     }
 
