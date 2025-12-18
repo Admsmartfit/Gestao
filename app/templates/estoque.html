@@ -54,9 +54,31 @@
                             </span>
                         </td>
                         <td data-label="Saldo">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual|float) }}</span>
-                                <span class="text-muted small">{{ item.unidade_medida }}</span>
+                            <div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual|float) }}</span>
+                                    <span class="text-muted small">{{ item.unidade_medida }}</span>
+                                </div>
+
+                                {% if current_user.tipo == 'admin' %}
+                                {# Visão Admin: Mostra distribuição em tooltip #}
+                                <small class="text-muted d-block mt-1" style="font-size: 0.7rem; cursor: help;"
+                                    title="{% for s in item.saldos %}{{ s.unidade.nome }}: {{ '{:g}'.format(s.quantidade) }}&#013;{% endfor %}">
+                                    <i class="bi bi-info-circle me-1"></i> Detalhes Distribuição
+                                </small>
+                                {% elif current_user.unidade_padrao_id %}
+                                {# Visão Local: Mostra saldo da unidade do usuário #}
+                                {% set ns = namespace(saldo_local=0) %}
+                                {% for s in item.saldos %}
+                                {% if s.unidade_id == current_user.unidade_padrao_id %}
+                                {% set ns.saldo_local = s.quantidade %}
+                                {% endif %}
+                                {% endfor %}
+                                <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">
+                                    Meu Local: <span class="fw-bold text-dark">{{ "{:g}".format(ns.saldo_local)
+                                        }}</span>
+                                </small>
+                                {% endif %}
                             </div>
                         </td>
                         <td data-label="Valor Unit.">
@@ -116,7 +138,6 @@
 </div>
 </div>
 
-<!-- Modal Nova Entrada / Ajuste -->
 <div class="modal fade" id="modalEntrada" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -138,7 +159,6 @@
                         </div>
                     </div>
 
-                    <!-- Exibido apenas no modo de ajuste rápido -->
                     <div class="mb-3 d-none" id="divItemFixo">
                         <label class="form-label">Item Selecionado</label>
                         <input type="text" class="form-control bg-light" id="nomeItemFixo" readonly>
@@ -180,7 +200,6 @@
     </div>
 </div>
 
-<!-- Modal Transferência -->
 <div class="modal fade" id="modalTransferencia" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">

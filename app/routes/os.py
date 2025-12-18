@@ -8,6 +8,7 @@ from app.models.terceirizados_models import Terceirizado, ChamadoExterno
 from app.services.os_service import OSService
 from app.services.estoque_service import EstoqueService
 
+
 bp = Blueprint('os', __name__, url_prefix='/os')
 
 @bp.route('/nova', methods=['GET', 'POST'])
@@ -279,80 +280,35 @@ def solicitar_compra():
 def solicitar_transferencia():
     data = request.get_json()
     try:
-        from app.models.estoque_models import SolicitacaoTransferencia, EstoqueSaldo
-        
         estoque_id = data.get('estoque_id')
-        qtd = float(data.get('quantidade'))
+        qtd = data.get('quantidade')
         unidade_origem_id = data.get('unidade_origem_id')
         unidade_destino_id = data.get('unidade_destino_id')
         
         if not all([estoque_id, qtd, unidade_origem_id, unidade_destino_id]):
              return jsonify({'success': False, 'erro': 'Dados incompletos'}), 400
-             
-        # Verificar Disponibilidade na Origem
-        saldo_origem = EstoqueSaldo.query.filter_by(
-            estoque_id=estoque_id, 
-            unidade_id=unidade_origem_id
-        ).first()
         
-        if not saldo_origem or saldo_origem.quantidade < qtd:
-             return jsonify({'success': False, 'erro': 'Saldo insuficiente na unidade de origem.'}), 400
+        # Define se aprova automaticamente baseado no cargo
+        aprovacao_automatica = current_user.tipo in ['admin', 'gerente']
 
-        solicitacao = SolicitacaoTransferencia(
+        solicitacao = EstoqueService.transferir_entre_unidades(
             estoque_id=estoque_id,
             unidade_origem_id=unidade_origem_id,
             unidade_destino_id=unidade_destino_id,
-            solicitante_id=current_user.id,
             quantidade=qtd,
-            status='pendente', # Ou 'aprovada' automaticamente se for admin/gerente
-            observacao=data.get('observacao')
+            solicitante_id=current_user.id,
+            observacao=data.get('observacao'),
+            aprovacao_automatica=aprovacao_automatica
         )
-        
-        # Se for Gerente ou Admin, já aprova e executa a movimentação
-        if current_user.tipo in ['admin', 'gerente']:
-            solicitacao.status = 'concluida'
-            solicitacao.data_conclusao = datetime.utcnow()
-            
-            # Executa a Movimentação Física
-            saldo_origem.quantidade -= Decimal(qtd)
-            
-            saldo_destino = EstoqueSaldo.query.filter_by(
-                estoque_id=estoque_id, 
-                unidade_id=unidade_destino_id
-            ).first()
-            
-            if not saldo_destino:
-                saldo_destino = EstoqueSaldo(estoque_id=estoque_id, unidade_id=unidade_destino_id, quantidade=0)
-                db.session.add(saldo_destino)
-            
-            saldo_destino.quantidade += Decimal(qtd)
-            
-            # Registra Histórico (Saída na Origem, Entrada no Destino)
-            from app.models.estoque_models import MovimentacaoEstoque
-            MovimentacaoEstoque(
-                estoque_id=estoque_id, usuario_id=current_user.id, unidade_id=unidade_origem_id,
-                tipo_movimentacao='saida', quantidade=qtd, observacao=f"Transferência para {unidade_destino_id}"
-            )
-            # O trigger update_saldo_estoque pode duplicar a conta se não formos cuidadosos.
-            # Como EstoqueSaldo é separado, precisamos garantir que o EstoqueGlobal se mantenha (Saida + Entrada = 0 impacto global)
-            
-            # Nota: O trigger atualiza Estoque.quantidade_atual (Global).
-            # Se fizermos Saida (-10) e Entrada (+10), o Global fica igual. Correto.
-            
-            db.session.add(MovimentacaoEstoque(
-                estoque_id=estoque_id, usuario_id=current_user.id, unidade_id=unidade_destino_id,
-                tipo_movimentacao='entrada', quantidade=qtd, observacao=f"Transferência de {unidade_origem_id}"
-            ))
-
-        db.session.add(solicitacao)
-        db.session.commit()
         
         msg = 'Transferência realizada com sucesso!' if solicitacao.status == 'concluida' else 'Solicitação de transferência criada.'
         return jsonify({'success': True, 'msg': msg})
 
-    except Exception as e:
+    except ValueError as e:
         return jsonify({'success': False, 'erro': str(e)}), 400
-
+    except Exception as e:
+        return jsonify({'success': False, 'erro': f"Erro interno: {str(e)}"}), 500
+    
 # --- ROTA QUE ESTAVA FALTANDO ---
 @bp.route('/api/equipamentos/filtro')
 @login_required
