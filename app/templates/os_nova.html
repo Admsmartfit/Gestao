@@ -1,125 +1,129 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <h2 class="mb-0">Nova Ordem de Serviço</h2>
-            <a href="{{ url_for('ponto.index') }}" class="btn btn-outline-secondary btn-sm">Cancelar</a>
-        </div>
-
-        <form method="POST" enctype="multipart/form-data" id="formOS">
-
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 text-primary"><i class="bi bi-geo-alt-fill me-2"></i>Local e Equipamento</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Unidade</label>
-                            <select name="unidade_id" id="selectUnidade" class="form-select" required
-                                onchange="carregarEquipamentos()">
-                                <option value="" disabled selected>Selecione...</option>
-                                {% for u in unidades %}
-                                <option value="{{ u.id }}">{{ u.nome }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Técnico Responsável</label>
-                            <select name="tecnico_id" class="form-select" required>
-                                {% for t in tecnicos %}
-                                <option value="{{ t.id }}" {% if t.id==current_user.id %}selected{% endif %}>{{ t.nome
-                                    }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="col-12">
-                            <hr class="text-muted opacity-25 my-1">
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Filtro de Categoria</label>
-                            <select id="selectCategoria" class="form-select" onchange="carregarEquipamentos()">
-                                <option value="" selected>Todas</option>
-                                <option value="cardio">Cardio</option>
-                                <option value="musculacao">Musculação</option>
-                                <option value="predial">Predial</option>
-                                <option value="diversos">Diversos</option>
-                            </select>
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label">Equipamento</label>
-                            <select name="equipamento_id" id="selectEquipamento" class="form-select" required disabled>
-                                <option value="">Selecione a Unidade primeiro...</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 text-secondary"><i class="bi bi-tools me-2"></i>Detalhes do Problema</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Tipo de Manutenção</label>
-                            <select name="tipo_manutencao" class="form-select">
-                                <option value="corretiva">Corretiva (Quebrou)</option>
-                                <option value="preventiva">Preventiva (Revisão)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Prioridade</label>
-                            <select name="prioridade" class="form-select">
-                                <option value="baixa">Baixa</option>
-                                <option value="media" selected>Média</option>
-                                <option value="alta">Alta</option>
-                                <option value="urgente">Urgente</option>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label text-danger">Prazo Limite</label>
-                            <input type="datetime-local" name="prazo_conclusao"
-                                class="form-control border-danger-subtle" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label d-flex justify-content-between align-items-center">
-                            Descrição do Problema
-                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-0"
-                                onclick="iniciarDitado('descricao_problema')">
-                                <i class="bi bi-mic-fill text-primary"></i> <span id="micText">Ditar Texto</span>
-                            </button>
-                        </label>
-                        <textarea name="descricao_problema" id="descricao_problema" class="form-control" rows="4"
-                            required placeholder="Descreva o defeito detalhadamente..."></textarea>
-                        <div id="micStatus" class="form-text text-primary d-none fw-bold"><i
-                                class="bi bi-record-circle me-1 blink"></i> Ouvindo...</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Fotos Iniciais</label>
-                        <input type="file" name="fotos_antes" class="form-control" multiple accept="image/*"
-                            id="inputFotos">
-                        <div id="previewFotos" class="d-flex mt-3 gap-2 overflow-auto pb-2"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="d-grid gap-2 mb-5">
-                <button type="submit" class="btn btn-primary btn-lg shadow-sm">
-                    <i class="bi bi-check-lg me-2"></i> Criar Ordem de Serviço
-                </button>
-            </div>
-        </form>
+<div class="mb-4">
+    <nav aria-label="breadcrumb" class="mb-1">
+        <ol class="breadcrumb mb-0" style="font-size: 0.75rem;">
+            <li class="breadcrumb-item"><a href="{{ url_for('ponto.index') }}"
+                    class="text-decoration-none">Dashboard</a></li>
+            <li class="breadcrumb-item active">Nova OS</li>
+        </ol>
+    </nav>
+    <div class="d-flex align-items-center justify-content-between">
+        <h2 class="mb-0 fw-bold">Nova Ordem de Serviço</h2>
+        <a href="{{ url_for('ponto.index') }}" class="btn btn-secondary btn-sm">Cancelar</a>
     </div>
 </div>
+
+<form method="POST" enctype="multipart/form-data" id="formOS">
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 text-primary"><i class="bi bi-geo-alt-fill me-2"></i>Local e Equipamento</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Unidade</label>
+                    <select name="unidade_id" id="selectUnidade" class="form-select" required
+                        onchange="carregarEquipamentos()">
+                        <option value="" disabled selected>Selecione...</option>
+                        {% for u in unidades %}
+                        <option value="{{ u.id }}">{{ u.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Técnico Responsável</label>
+                    <select name="tecnico_id" class="form-select" required>
+                        {% for t in tecnicos %}
+                        <option value="{{ t.id }}" {% if t.id==current_user.id %}selected{% endif %}>{{ t.nome
+                            }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <hr class="text-muted opacity-25 my-1">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Filtro de Categoria</label>
+                    <select id="selectCategoria" class="form-select" onchange="carregarEquipamentos()">
+                        <option value="" selected>Todas</option>
+                        <option value="cardio">Cardio</option>
+                        <option value="musculacao">Musculação</option>
+                        <option value="predial">Predial</option>
+                        <option value="diversos">Diversos</option>
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Equipamento</label>
+                    <select name="equipamento_id" id="selectEquipamento" class="form-select" required disabled>
+                        <option value="">Selecione a Unidade primeiro...</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 text-secondary"><i class="bi bi-tools me-2"></i>Detalhes do Problema</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Tipo de Manutenção</label>
+                    <select name="tipo_manutencao" class="form-select">
+                        <option value="corretiva">Corretiva (Quebrou)</option>
+                        <option value="preventiva">Preventiva (Revisão)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Prioridade</label>
+                    <select name="prioridade" class="form-select">
+                        <option value="baixa">Baixa</option>
+                        <option value="media" selected>Média</option>
+                        <option value="alta">Alta</option>
+                        <option value="urgente">Urgente</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-danger">Prazo Limite</label>
+                    <input type="datetime-local" name="prazo_conclusao" class="form-control border-danger-subtle"
+                        required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label d-flex justify-content-between align-items-center">
+                    Descrição do Problema
+                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0"
+                        onclick="iniciarDitado('descricao_problema')">
+                        <i class="bi bi-mic-fill text-primary"></i> <span id="micText">Ditar Texto</span>
+                    </button>
+                </label>
+                <textarea name="descricao_problema" id="descricao_problema" class="form-control" rows="4" required
+                    placeholder="Descreva o defeito detalhadamente..."></textarea>
+                <div id="micStatus" class="form-text text-primary d-none fw-bold"><i
+                        class="bi bi-record-circle me-1 blink"></i> Ouvindo...</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Fotos Iniciais</label>
+                <input type="file" name="fotos_antes" class="form-control" multiple accept="image/*" id="inputFotos">
+                <div id="previewFotos" class="d-flex mt-3 gap-2 overflow-auto pb-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-grid gap-2 mb-5">
+        <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+            <i class="bi bi-check-lg me-2"></i> Criar Ordem de Serviço
+        </button>
+    </div>
+</form>
 
 <script>
     // Lógica de equipamentos (AJAX) - Mantida funcionalidade, ajustada UI

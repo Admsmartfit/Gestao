@@ -23,78 +23,140 @@
     <input type="hidden" id="flash-messages"
         data-messages='[{% for category, message in get_flashed_messages(with_categories=true) %}{"category": "{{ category }}", "message": "{{ message }}"}{{ "," if not loop.last }}{% endfor %}]'>
 
-    <nav class="navbar navbar-expand-lg sticky-top">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('ponto.index') }}">
-                <i class="bi bi-grid-fill text-primary"></i>
-                <span>GMM</span>
-            </a>
+    <div class="app-shell">
+        <!-- Sidebar -->
+        <aside class="app-sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a class="text-white text-decoration-none d-flex align-items-center gap-2"
+                    href="{{ url_for('ponto.index') }}">
+                    <i class="bi bi-grid-fill text-primary"></i>
+                    <span class="fw-bold fs-5">GMM</span>
+                </a>
+                <button class="btn btn-icon d-lg-none ms-auto text-white" onclick="toggleSidebar()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
 
-            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <i class="bi bi-list fs-4"></i>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="sidebar-nav">
                 {% if current_user.is_authenticated %}
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('ponto.index') }}">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('os.painel_estoque') }}">Estoque</a>
-                    </li>
+                <div class="nav-group">
+                    <div class="nav-group-title">Principal</div>
+                    <a href="{{ url_for('ponto.index') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'ponto.index' }}">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                    {% if current_user.tipo in ['admin', 'gerente', 'comprador'] %}
+                    <a href="{{ url_for('analytics.dashboard') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'analytics.dashboard' }}">
+                        <i class="bi bi-pie-chart-fill"></i> Analytics
+                    </a>
+                    {% endif %}
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-group-title">Operacional</div>
+                    <a href="{{ url_for('ponto.index') }}#minhas-os" class="nav-link-saas">
+                        <i class="bi bi-tools"></i> Minhas OS
+                    </a>
+                    <a href="{{ url_for('ponto.index') }}" class="nav-link-saas">
+                        <i class="bi bi-stopwatch"></i> Ponto
+                    </a>
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-group-title">Gestão</div>
+                    <a href="{{ url_for('os.painel_estoque') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'os.painel_estoque' }}">
+                        <i class="bi bi-box-seam"></i> Estoque
+                    </a>
                     {% if current_user.tipo in ['admin', 'comprador'] %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin.compras_painel') }}">Compras</a>
-                    </li>
+                    <a href="{{ url_for('admin.compras_painel') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'admin.compras_painel' }}">
+                        <i class="bi bi-cart3"></i> Compras
+                    </a>
                     {% endif %}
                     {% if current_user.tipo in ['admin', 'gerente'] %}
-                    <li class="nav-item">
-                        <a class="nav-link fw-medium" href="{{ url_for('admin.transferencias_painel') }}">
-                            Transferências
-                        </a>
-                    </li>
+                    <a href="{{ url_for('admin.transferencias_painel') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'admin.transferencias_painel' }}">
+                        <i class="bi bi-arrow-left-right"></i> Transferências
+                    </a>
                     {% endif %}
                     {% if current_user.tipo in ['admin', 'gerente', 'comprador'] %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('analytics.dashboard') }}">Analytics</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin.relatorio_movimentacoes') }}">Relatórios</a>
-                    </li>
+                    <a href="{{ url_for('admin.relatorio_movimentacoes') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'admin.relatorio_movimentacoes' }}">
+                        <i class="bi bi-file-earmark-text"></i> Relatórios
+                    </a>
                     {% endif %}
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-group-title">Configurações</div>
                     {% if current_user.tipo == 'admin' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Configurações</a>
-                    </li>
+                    <a href="{{ url_for('admin.dashboard') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'admin.dashboard' }}">
+                        <i class="bi bi-gear"></i> Admin Panel
+                    </a>
                     {% endif %}
-                </ul>
+                </div>
+                {% endif %}
+            </div>
 
-                <div class="d-flex align-items-center gap-3 ms-auto pt-3 pt-lg-0">
+            {% if current_user.is_authenticated %}
+            <div class="p-3 border-top border-secondary border-opacity-10">
+                <a href="{{ url_for('auth.logout') }}" class="nav-link-saas text-danger">
+                    <i class="bi bi-box-arrow-right"></i> Sair
+                </a>
+            </div>
+            {% endif %}
+        </aside>
 
-                    <button class="btn btn-secondary btn-sm d-none d-md-flex align-items-center gap-2"
-                        onclick="SearchModule.open()">
-                        <i class="bi bi-search"></i>
-                        <span class="opacity-50 fw-normal small">Ctrl K</span>
+        <!-- Main Content -->
+        <div class="main-wrapper">
+            <!-- Header -->
+            <header class="app-header">
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-icon d-lg-none" onclick="toggleSidebar()">
+                        <i class="bi bi-list fs-4"></i>
                     </button>
-                    <button class="btn btn-icon d-md-none text-muted p-2" onclick="SearchModule.open()">
+
+                    <button class="btn btn-secondary border-0 bg-light d-none d-md-flex align-items-center gap-2 px-3"
+                        onclick="SearchModule.open()">
+                        <i class="bi bi-search small text-muted"></i>
+                        <span class="text-muted fw-normal small">Buscar...</span>
+                        <span class="badge bg-white text-muted border ms-2" style="font-size: 10px;">Ctrl K</span>
+                    </button>
+                    <button class="btn btn-icon d-md-none text-muted" onclick="SearchModule.open()">
                         <i class="bi bi-search fs-5"></i>
+                    </button>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-icon text-muted position-relative p-0 border-0 bg-transparent">
+                        <i class="bi bi-bell fs-5"></i>
+                        <span
+                            class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"
+                            style="margin-top: 5px; margin-left: -5px;">
+                            <span class="visually-hidden">Novas notificações</span>
+                        </span>
                     </button>
 
                     <div class="dropdown">
                         <button
-                            class="btn btn-link text-decoration-none p-0 d-flex align-items-center gap-2 dropdown-toggle"
+                            class="btn btn-link text-decoration-none p-0 d-flex align-items-center gap-2 dropdown-toggle-no-caret"
                             data-bs-toggle="dropdown">
-                            <div class="avatar-circle bg-primary bg-opacity-10 text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center"
-                                style="width: 36px; height: 36px;">
+                            <div class="avatar-circle bg-accent bg-opacity-10 text-accent fw-bold rounded-circle d-flex align-items-center justify-content-center"
+                                style="width: 38px; height: 38px; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border);">
                                 {{ current_user.nome[0] | upper }}
                             </div>
-                            <span class="d-lg-none fw-medium text-dark">{{ current_user.nome }}</span>
+                            <div class="text-start d-none d-lg-block" style="line-height: 1.2;">
+                                <div class="fw-bold text-dark small">{{ current_user.nome }}</div>
+                                <div class="text-muted" style="font-size: 10px;">{{ current_user.tipo | upper }}</div>
+                            </div>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2"
                             style="min-width: 200px;">
                             <li>
-                                <h6 class="dropdown-header text-uppercase small fw-bold">Conta</h6>
+                                <h6 class="dropdown-header text-uppercase small fw-bold">Perfil</h6>
                             </li>
                             <li><span class="dropdown-item-text fw-medium text-dark">{{ current_user.nome }}</span></li>
                             <li><span class="dropdown-item-text text-muted small">{{ current_user.email }}</span></li>
@@ -110,22 +172,21 @@
                         </ul>
                     </div>
                 </div>
-                {% endif %}
-            </div>
+            </header>
+
+            <main class="content-inner">
+                {% block content %}{% endblock %}
+            </main>
         </div>
-    </nav>
+    </div>
 
-    <main class="container py-4">
-        <nav aria-label="breadcrumb" class="mb-4 d-none d-md-block">
-            <ol class="breadcrumb bg-white p-3 rounded shadow-sm border border-light">
-                {% block breadcrumb %}
-                <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
-                {% endblock %}
-            </ol>
-        </nav>
-
-        {% block content %}{% endblock %}
-    </main>
+    <!-- Floating Action Button for Mobile -->
+    <div class="d-lg-none position-fixed bottom-0 end-0 p-3" style="z-index: 1040;">
+        <a href="{{ url_for('os.nova_os') }}" class="btn btn-primary rounded-circle shadow-lg"
+            style="width: 56px; height: 56px;">
+            <i class="bi bi-plus-lg fs-4"></i>
+        </a>
+    </div>
 
     <div id="searchBackdrop" class="search-backdrop">
         <div class="search-modal">

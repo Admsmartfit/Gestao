@@ -1,10 +1,17 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+<div class="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
     <div>
-        <h2 class="mb-1">Tarefas Externas</h2>
-        <p class="mb-0">Serviços terceirizados e manutenção.</p>
+        <nav aria-label="breadcrumb" class="mb-1">
+            <ol class="breadcrumb mb-0" style="font-size: 0.75rem;">
+                <li class="breadcrumb-item"><a href="{{ url_for('ponto.index') }}"
+                        class="text-decoration-none">Dashboard</a></li>
+                <li class="breadcrumb-item active">Tarefas Externas</li>
+            </ol>
+        </nav>
+        <h2 class="mb-0 fw-bold underline-none">Terceirizados</h2>
+        <p class="mb-0 text-muted small">Gestão de serviços externos e manutenção predial.</p>
     </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoChamado">
         <i class="bi bi-plus-lg"></i> Nova Tarefa

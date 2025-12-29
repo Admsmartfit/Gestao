@@ -6,211 +6,212 @@
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-10">
-        <div
-            class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-            <div>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <h2 class="mb-0 fw-bold">{{ os.numero_os }}</h2>
-                    {% if os.status == 'aberta' %}
-                    <span class="badge bg-warning text-dark">Aberta</span>
-                    {% elif os.status == 'concluida' %}
-                    <span class="badge bg-success">Concluída</span>
-                    {% else %}
-                    <span class="badge bg-secondary">{{ os.status }}</span>
-                    {% endif %}
-                </div>
-                <div class="text-muted small">
-                    <i class="bi bi-geo-alt-fill text-primary me-1"></i> {{ os.unidade.nome }}
-                    <span class="mx-2">•</span>
-                    <i class="bi bi-person-fill text-secondary me-1"></i> {{ os.tecnico.nome }}
-                </div>
-            </div>
+<div class="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+    <div>
+        <nav aria-label="breadcrumb" class="mb-1">
+            <ol class="breadcrumb mb-0" style="font-size: 0.75rem;">
+                <li class="breadcrumb-item"><a href="{{ url_for('ponto.index') }}"
+                        class="text-decoration-none">Dashboard</a></li>
+                <li class="breadcrumb-item active">OS #{{ os.numero_os }}</li>
+            </ol>
+        </nav>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="mb-0 fw-bold">{{ os.numero_os }}</h2>
+            {% if os.status == 'aberta' %}
+            <span class="badge bg-warning">Aberta</span>
+            {% elif os.status == 'concluida' %}
+            <span class="badge bg-success">Concluída</span>
+            {% else %}
+            <span class="badge bg-secondary text-capitalize">{{ os.status }}</span>
+            {% endif %}
+        </div>
+        <div class="text-muted small mt-1">
+            <i class="bi bi-geo-alt-fill text-accent me-1"></i> {{ os.unidade.nome }}
+            <span class="mx-2 opacity-25">•</span>
+            <i class="bi bi-person-fill text-muted me-1"></i> {{ os.tecnico.nome }}
+        </div>
+    </div>
 
-            <div class="d-flex flex-column flex-md-row align-items-md-end gap-2 text-md-end">
-                <div>
-                    <div class="text-muted small text-uppercase fw-bold">Custo Total</div>
-                    <div class="fs-4 fw-bold text-dark">R$ <span id="custoTotal">{{ "{:.2f}".format(os.custo_total)
-                            }}</span></div>
-                </div>
-                {% if os.prazo_conclusao %}
-                <div class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-3 py-2">
-                    <i class="bi bi-clock me-1"></i> Prazo: {{ os.prazo_conclusao.strftime('%d/%m %H:%M') }}
-                </div>
-                {% endif %}
+    <div class="d-flex align-items-center gap-4">
+        <div class="text-md-end">
+            <div class="text-muted small text-uppercase fw-bold opacity-75">Custo Total</div>
+            <div class="fs-4 fw-bold text-dark">R$ <span id="custoTotal">{{ "{:.2f}".format(os.custo_total) }}</span>
             </div>
         </div>
-
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 text-secondary fw-bold"><i class="bi bi-info-circle me-2"></i>Detalhes do Serviço</h5>
-                {% if os.status != 'concluida' %}
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditarOS">
-                    <i class="bi bi-pencil me-1"></i> Editar
-                </button>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <label class="form-label">Equipamento</label>
-                        <div class="d-flex align-items-center gap-2">
-                            {% if os.equipamento_rel %}
-                            <span class="fw-medium">{{ os.equipamento_rel.nome }}</span>
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border">{{
-                                os.equipamento_rel.categoria }}</span>
-                            {% else %}
-                            <span class="text-muted fst-italic">Não vinculado</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Prioridade</label>
-                        <div>
-                            {% if os.prioridade == 'urgente' %}
-                            <span class="badge bg-danger text-white">Urgente</span>
-                            {% elif os.prioridade == 'alta' %}
-                            <span class="badge bg-warning text-dark">Alta</span>
-                            {% else %}
-                            <span class="badge bg-info text-dark">Normal</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label class="form-label">Tipo de Manutenção</label>
-                                <div class="fw-medium text-capitalize">{{ os.tipo_manutencao }}</div>
-                            </div>
-                            <div class="col-md-6 mt-3 mt-md-0">
-                                <label class="form-label">Problema Relatado</label>
-                                <div class="p-3 bg-light rounded border text-muted">
-                                    {{ os.descricao_problema }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-4">
-                    <label class="form-label">Fotos Iniciais</label>
-                    <div class="d-flex gap-2 flex-wrap">
-                        {% if os.fotos_antes %}
-                        {% for foto in os.fotos_antes %}
-                        <a href="{{ url_for('static', filename=foto) }}" target="_blank"
-                            class="d-block position-relative group">
-                            <img src="{{ url_for('static', filename=foto) }}" class="img-thumbnail rounded-3 shadow-sm"
-                                style="height: 100px; width: 100px; object-fit: cover;">
-                        </a>
-                        {% endfor %}
-                        {% else %}
-                        <div class="text-muted small fst-italic">Sem fotos registradas.</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm border-0 mb-5">
-            <div
-                class="card-header bg-white py-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
-                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-tools me-2"></i>Recursos Utilizados</h5>
-                {% if os.status != 'concluida' %}
-                <button class="btn btn-primary btn-sm w-100 w-md-auto" data-bs-toggle="modal"
-                    data-bs-target="#modalRecursos">
-                    <i class="bi bi-plus-lg me-1"></i> Adicionar (Peça/Serviço)
-                </button>
-                {% endif %}
-            </div>
-
-            <div class="card-body p-0">
-                <div class="bg-light px-3 py-2 border-bottom fw-bold text-uppercase small text-muted">Peças do Estoque
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-hover table-responsive-stack mb-0">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Peça</th>
-                                <th>Qtd</th>
-                                <th>Unitário</th>
-                                <th>Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if os.movimentacoes %}
-                            {% for mov in os.movimentacoes %}
-                            {% if mov.tipo_movimentacao == 'consumo' %}
-                            <tr>
-                                <td data-label="Peça" class="fw-medium">{{ mov.estoque.nome }}</td>
-                                <td data-label="Qtd">{{ "{:g}".format(mov.quantidade) }} {{ mov.estoque.unidade_medida
-                                    }}</td>
-                                <td data-label="Unitário" class="text-muted">R$ {{
-                                    "{:.2f}".format(mov.estoque.valor_unitario or 0) }}</td>
-                                <td data-label="Subtotal" class="fw-bold text-dark">R$ {{ "{:.2f}".format(mov.quantidade
-                                    * (mov.estoque.valor_unitario or 0)) }}</td>
-                            </tr>
-                            {% endif %}
-                            {% endfor %}
-                            {% else %}
-                            <tr>
-                                <td colspan="4" class="text-center py-3 text-muted small">Nenhuma peça utilizada.</td>
-                            </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="bg-light px-3 py-2 border-bottom border-top fw-bold text-uppercase small text-muted">
-                    Serviços Terceirizados</div>
-                <div class="table-responsive">
-                    <table class="table table-hover table-responsive-stack mb-0">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Prestador</th>
-                                <th>Descrição</th>
-                                <th>Prazo</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if os.chamados_externos %}
-                            {% for ch in os.chamados_externos %}
-                            <tr>
-                                <td data-label="Prestador" class="fw-medium">{{ ch.terceirizado.nome }}</td>
-                                <td data-label="Descrição" class="text-muted text-truncate" style="max-width: 200px;">{{
-                                    ch.descricao }}</td>
-                                <td data-label="Prazo">{{ ch.prazo_combinado.strftime('%d/%m') }}</td>
-                                <td data-label="Status">
-                                    <span
-                                        class="badge bg-{{ 'success' if ch.status=='concluido' else 'warning' }} bg-opacity-10 text-{{ 'success' if ch.status=='concluido' else 'warning' }}">
-                                        {{ ch.status|upper }}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            {% else %}
-                            <tr>
-                                <td colspan="4" class="text-center py-3 text-muted small">Nenhum serviço externo.</td>
-                            </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        {% if os.status != 'concluida' %}
-        <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
-            <button class="btn btn-outline-danger px-4" data-bs-toggle="modal" data-bs-target="#modalCancelar">Cancelar
-                OS</button>
-            <button class="btn btn-success px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalConcluir">
-                <i class="bi bi-check-lg me-2"></i> Concluir Serviço
-            </button>
+        {% if os.prazo_conclusao %}
+        <div class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-3 py-2">
+            <i class="bi bi-clock me-1"></i> Prazo: {{ os.prazo_conclusao.strftime('%d/%m %H:%M') }}
         </div>
         {% endif %}
     </div>
 </div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 text-secondary fw-bold"><i class="bi bi-info-circle me-2"></i>Detalhes do Serviço</h5>
+        {% if os.status != 'concluida' %}
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditarOS">
+            <i class="bi bi-pencil me-1"></i> Editar
+        </button>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <label class="form-label">Equipamento</label>
+                <div class="d-flex align-items-center gap-2">
+                    {% if os.equipamento_rel %}
+                    <span class="fw-medium">{{ os.equipamento_rel.nome }}</span>
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary border">{{
+                        os.equipamento_rel.categoria }}</span>
+                    {% else %}
+                    <span class="text-muted fst-italic">Não vinculado</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Prioridade</label>
+                <div>
+                    {% if os.prioridade == 'urgente' %}
+                    <span class="badge bg-danger text-white">Urgente</span>
+                    {% elif os.prioridade == 'alta' %}
+                    <span class="badge bg-warning text-dark">Alta</span>
+                    {% else %}
+                    <span class="badge bg-info text-dark">Normal</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Tipo de Manutenção</label>
+                        <div class="fw-medium text-capitalize">{{ os.tipo_manutencao }}</div>
+                    </div>
+                    <div class="col-md-6 mt-3 mt-md-0">
+                        <label class="form-label">Problema Relatado</label>
+                        <div class="p-3 bg-light rounded border text-muted">
+                            {{ os.descricao_problema }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <label class="form-label">Fotos Iniciais</label>
+            <div class="d-flex gap-2 flex-wrap">
+                {% if os.fotos_antes %}
+                {% for foto in os.fotos_antes %}
+                <a href="{{ url_for('static', filename=foto) }}" target="_blank"
+                    class="d-block position-relative group">
+                    <img src="{{ url_for('static', filename=foto) }}" class="img-thumbnail rounded-3 shadow-sm"
+                        style="height: 100px; width: 100px; object-fit: cover;">
+                </a>
+                {% endfor %}
+                {% else %}
+                <div class="text-muted small fst-italic">Sem fotos registradas.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-5">
+    <div
+        class="card-header bg-white py-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-tools me-2"></i>Recursos Utilizados</h5>
+        {% if os.status != 'concluida' %}
+        <button class="btn btn-primary btn-sm w-100 w-md-auto" data-bs-toggle="modal" data-bs-target="#modalRecursos">
+            <i class="bi bi-plus-lg me-1"></i> Adicionar (Peça/Serviço)
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="card-body p-0">
+        <div class="bg-light px-3 py-2 border-bottom fw-bold text-uppercase small text-muted">Peças do Estoque
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-responsive-stack mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Peça</th>
+                        <th>Qtd</th>
+                        <th>Unitário</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if os.movimentacoes %}
+                    {% for mov in os.movimentacoes %}
+                    {% if mov.tipo_movimentacao == 'consumo' %}
+                    <tr>
+                        <td data-label="Peça" class="fw-medium">{{ mov.estoque.nome }}</td>
+                        <td data-label="Qtd">{{ "{:g}".format(mov.quantidade) }} {{ mov.estoque.unidade_medida
+                            }}</td>
+                        <td data-label="Unitário" class="text-muted">R$ {{
+                            "{:.2f}".format(mov.estoque.valor_unitario or 0) }}</td>
+                        <td data-label="Subtotal" class="fw-bold text-dark">R$ {{ "{:.2f}".format(mov.quantidade
+                            * (mov.estoque.valor_unitario or 0)) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-3 text-muted small">Nenhuma peça utilizada.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="bg-light px-3 py-2 border-bottom border-top fw-bold text-uppercase small text-muted">
+            Serviços Terceirizados</div>
+        <div class="table-responsive">
+            <table class="table table-hover table-responsive-stack mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Prestador</th>
+                        <th>Descrição</th>
+                        <th>Prazo</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if os.chamados_externos %}
+                    {% for ch in os.chamados_externos %}
+                    <tr>
+                        <td data-label="Prestador" class="fw-medium">{{ ch.terceirizado.nome }}</td>
+                        <td data-label="Descrição" class="text-muted text-truncate" style="max-width: 200px;">{{
+                            ch.descricao }}</td>
+                        <td data-label="Prazo">{{ ch.prazo_combinado.strftime('%d/%m') }}</td>
+                        <td data-label="Status">
+                            <span
+                                class="badge bg-{{ 'success' if ch.status=='concluido' else 'warning' }} bg-opacity-10 text-{{ 'success' if ch.status=='concluido' else 'warning' }}">
+                                {{ ch.status|upper }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-3 text-muted small">Nenhum serviço externo.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if os.status != 'concluida' %}
+<div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
+    <button class="btn btn-outline-danger px-4" data-bs-toggle="modal" data-bs-target="#modalCancelar">Cancelar
+        OS</button>
+    <button class="btn btn-success px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalConcluir">
+        <i class="bi bi-check-lg me-2"></i> Concluir Serviço
+    </button>
+</div>
+{% endif %}
 
 <div class="modal fade" id="modalConcluir" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">

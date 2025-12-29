@@ -1,68 +1,76 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Controle de Ponto</h2>
+<div class="mb-4">
+    <nav aria-label="breadcrumb" class="mb-1">
+        <ol class="breadcrumb mb-0" style="font-size: 0.75rem;">
+            <li class="breadcrumb-item"><a href="{{ url_for('ponto.index') }}"
+                    class="text-decoration-none">Dashboard</a></li>
+            <li class="breadcrumb-item active">Controle de Ponto</li>
+        </ol>
+    </nav>
+    <h2 class="mb-0 fw-bold">Ponto Eletrônico</h2>
+    <p class="mb-0 text-muted small">Registro de entrada e saída por geolocalização.</p>
+</div>
 
-        <div class="card mb-4 p-4 shadow-sm">
-            <div class="card-body text-center">
-                {% if registro_aberto %}
-                <div class="alert alert-success">
-                    <h4>Entrada registrada em: {{ registro_aberto.data_hora_entrada.strftime('%d/%m/%Y %H:%M') }}</h4>
-                    <p>Unidade: {{ registro_aberto.unidade.nome }}</p>
-                </div>
-                <form action="{{ url_for('ponto.checkout') }}" method="POST">
-                    <input type="hidden" name="registro_id" value="{{ registro_aberto.id }}">
-                    <button type="submit" class="btn btn-danger btn-lg px-5">
-                        <i class="bi bi-box-arrow-right"></i> Registrar Saída
-                    </button>
-                </form>
-                {% else %}
-                <form action="{{ url_for('ponto.checkin') }}" method="POST" class="row justify-content-center">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Selecione a Unidade:</label>
-                        <select name="unidade_id" class="form-select form-select-lg" required>
-                            <option value="" selected disabled>Escolha...</option>
-                            {% for u in unidades %}
-                            <option value="{{ u.id }}">{{ u.nome }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-success btn-lg px-5">
-                            <i class="bi bi-box-arrow-in-right"></i> Registrar Entrada
-                        </button>
-                    </div>
-                </form>
-                {% endif %}
-            </div>
+<div class="card mb-4 p-4 shadow-sm">
+    <div class="card-body text-center">
+        {% if registro_aberto %}
+        <div class="alert alert-success">
+            <h4>Entrada registrada em: {{ registro_aberto.data_hora_entrada.strftime('%d/%m/%Y %H:%M') }}</h4>
+            <p>Unidade: {{ registro_aberto.unidade.nome }}</p>
         </div>
-
-        <h4>Histórico Recente</h4>
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Unidade</th>
-                        <th>Entrada</th>
-                        <th>Saída</th>
-                        <th>IP Origem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in historico %}
-                    <tr>
-                        <td>{{ r.data_hora_entrada.strftime('%d/%m/%Y') }}</td>
-                        <td>{{ r.unidade.nome }}</td>
-                        <td>{{ r.data_hora_entrada.strftime('%H:%M') }}</td>
-                        <td>{{ r.data_hora_saida.strftime('%H:%M') if r.data_hora_saida else '-' }}</td>
-                        <td>{{ r.ip_origem_entrada }}</td>
-                    </tr>
+        <form action="{{ url_for('ponto.checkout') }}" method="POST">
+            <input type="hidden" name="registro_id" value="{{ registro_aberto.id }}">
+            <button type="submit" class="btn btn-danger btn-lg px-5">
+                <i class="bi bi-box-arrow-right"></i> Registrar Saída
+            </button>
+        </form>
+        {% else %}
+        <form action="{{ url_for('ponto.checkin') }}" method="POST" class="row justify-content-center">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Selecione a Unidade:</label>
+                <select name="unidade_id" class="form-select form-select-lg" required>
+                    <option value="" selected disabled>Escolha...</option>
+                    {% for u in unidades %}
+                    <option value="{{ u.id }}">{{ u.nome }}</option>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-success btn-lg px-5">
+                    <i class="bi bi-box-arrow-in-right"></i> Registrar Entrada
+                </button>
+            </div>
+        </form>
+        {% endif %}
     </div>
+</div>
+
+<h4>Histórico Recente</h4>
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Unidade</th>
+                <th>Entrada</th>
+                <th>Saída</th>
+                <th>IP Origem</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in historico %}
+            <tr>
+                <td>{{ r.data_hora_entrada.strftime('%d/%m/%Y') }}</td>
+                <td>{{ r.unidade.nome }}</td>
+                <td>{{ r.data_hora_entrada.strftime('%H:%M') }}</td>
+                <td>{{ r.data_hora_saida.strftime('%H:%M') if r.data_hora_saida else '-' }}</td>
+                <td>{{ r.ip_origem_entrada }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</div>
 </div>
 {% endblock %}
