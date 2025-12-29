@@ -55,36 +55,27 @@
                         </td>
                         <td data-label="Saldo">
                             <div class="d-flex align-items-center gap-2">
-                                <span class="fw-bold fs-6">{{ "{:g}".format(item.quantidade_atual|float) }}</span>
+                                <span class="fw-bold fs-6 text-primary">{{ "{:g}".format(item.quantidade_atual|float)
+                                    }}</span>
                                 <span class="text-muted small">{{ item.unidade_medida }}</span>
-
-                                <!-- Ícone de Lupa para Ver Distribuição (Para todos, ou pelo menos Admin) -->
-                                <button class="btn btn-icon btn-sm p-0 text-primary opacity-75 hover-opacity-100"
-                                    onclick="verDistribuicao('{{ item.id }}', '{{ item.nome }}')"
-                                    title="Ver distribuição por unidade">
-                                    <i class="bi bi-search" style="font-size: 0.8rem;"></i>
-                                </button>
                             </div>
 
-                            {% if current_user.tipo == 'tecnico' and current_user.unidade_padrao_id %}
-                            {# Visão Local para Técnico #}
-                            {% set ns = namespace(saldo_local=0) %}
-                            {% for s in item.saldos %}
-                            {% if s.unidade_id == current_user.unidade_padrao_id %}
-                            {% set ns.saldo_local = s.quantidade %}
-                            {% endif %}
-                            {% endfor %}
-                            <div class="saldo-local">
-                                🏠 Meu Local: <span class="fw-bold">{{ "{:g}".format(ns.saldo_local) }}</span>
+                            {% if item.saldos %}
+                            <div class="mt-2 pt-2 border-top border-light">
+                                <div class="small fw-bold text-muted mb-1"
+                                    style="font-size: 0.65rem; text-transform: uppercase;">Por Unidade:</div>
+                                <ul class="list-unstyled mb-0 d-flex flex-wrap gap-x-3 gap-y-1"
+                                    style="font-size: 0.7rem;">
+                                    {% for s in item.saldos %}
+                                    <li class="text-nowrap">
+                                        <span class="text-muted">{{ s.unidade.nome }}:</span>
+                                        <span class="fw-bold {{ 'text-danger' if s.quantidade < 0 else 'text-dark' }}">
+                                            {{ "{:g}".format(s.quantidade|float) }}
+                                        </span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
                             </div>
-                            {% endif %}
-
-                            {% if current_user.tipo == 'admin' %}
-                            {# Tooltip adicional para Admin #}
-                            <small class="text-muted d-block mt-1" style="cursor: help; font-size: 0.7rem;"
-                                title="{% for s in item.saldos %}{{ s.unidade.nome }}: {{ '{:g}'.format(s.quantidade) }}&#013;{% endfor %}">
-                                <i class="bi bi-info-circle me-1"></i> Tooltip Rápido
-                            </small>
                             {% endif %}
                         </td>
                         <td data-label="Valor Unit.">
@@ -96,7 +87,7 @@
                                 <span class="badge bg-danger text-white shadow-sm shimmer">BAIXO</span>
                                 <button class="btn btn-xs btn-danger btn-sm-custom ms-2 fade-in"
                                     onclick="solicitarCompraItem('{{ item.id }}', '{{ item.nome }}', '{{ item.quantidade_minima }}')">
-                                    <i class="bi bi-cart-plus"></i> Comprar
+                                    🛒 Comprar
                                 </button>
         </div>
         {% else %}
@@ -159,6 +150,7 @@
                             <tr>
                                 <th>Unidade</th>
                                 <th class="text-end">Saldo</th>
+                                <th class="text-end">Localização</th>
                             </tr>
                         </thead>
                         <tbody id="distTabelaCorpo">
@@ -213,6 +205,8 @@
                         <div class="col-6">
                             <label class="form-label">Quantidade</label>
                             <input type="number" step="0.01" class="form-control" id="qtdEntrada" required>
+                            <div class="form-text x-small">Use valores negativos (ex: -5) para furto, dano ou perda.
+                            </div>
                         </div>
                         <div class="col-6">
                             <label class="form-label">Valor Unit. (R$)</label>
@@ -348,11 +342,9 @@
 
                     <div class="alert alert-info py-2 small border-0 mb-3" id="transfInfoText">
                         {% if current_user.tipo in ['admin', 'gerente'] %}
-                        <i class="bi bi-lightning-fill me-1"></i> Esta transferência será executada
-                        <strong>imediatamente</strong>.
+                        <i class="bi bi-lightning-fill me-1"></i> Será executado imediatamente
                         {% else %}
-                        <i class="bi bi-hourglass-split me-1"></i> Sua solicitação será enviada para
-                        <strong>aprovação</strong>.
+                        <i class="bi bi-hourglass-split me-1"></i> Será enviado para aprovação
                         {% endif %}
                     </div>
 
@@ -806,7 +798,7 @@
         const total = document.getElementById('distTotalGlobal');
 
         nomeEl.innerText = nome;
-        corpo.innerHTML = '<tr><td colspan="2" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
+        corpo.innerHTML = '<tr><td colspan="3" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
         total.innerText = '...';
 
         const modal = new bootstrap.Modal(document.getElementById('modalDistribuicao'));
@@ -823,6 +815,7 @@
                     tr.innerHTML = `
                         <td>${d.unidade_nome}</td>
                         <td class="text-end fw-bold">${d.saldo} ${data.unidade_medida}</td>
+                        <td class="text-end text-muted small">${d.localizacao}</td>
                     `;
                     corpo.appendChild(tr);
                 });
@@ -831,7 +824,7 @@
             }
             total.innerText = `${data.saldo_global} ${data.unidade_medida}`;
         } catch (e) {
-            corpo.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-danger">Erro ao carregar distribuição.</td></tr>';
+            corpo.innerHTML = '<tr><td colspan="3" class="text-center py-3 text-danger">Erro ao carregar distribuição.</td></tr>';
         }
     }
 

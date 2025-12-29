@@ -202,7 +202,8 @@
 
         {% if os.status != 'concluida' %}
         <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
-            <button class="btn btn-outline-danger px-4">Cancelar OS</button>
+            <button class="btn btn-outline-danger px-4" data-bs-toggle="modal" data-bs-target="#modalCancelar">Cancelar
+                OS</button>
             <button class="btn btn-success px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalConcluir">
                 <i class="bi bi-check-lg me-2"></i> Concluir Serviço
             </button>
@@ -268,6 +269,30 @@
     </div>
 </div>
 
+<!-- Modal Cancelar -->
+<div class="modal fade" id="modalCancelar" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger">Cancelar Ordem de Serviço</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-4 text-center">
+                <i class="bi bi-exclamation-triangle text-danger fs-1 mb-3 d-block"></i>
+                <h6 class="fw-bold">Tem certeza que deseja cancelar esta OS?</h6>
+                <p class="text-muted small mb-0">Todas as peças consumidas serão estornadas para o estoque da unidade.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Manter OS</button>
+                <form action="{{ url_for('os.cancelar_os_route', id=os.id) }}" method="POST">
+                    <button type="submit" class="btn btn-danger px-4">Confirmar Cancelamento</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Transferência (Prompt 5) -->
 <div class="modal fade" id="modalTransferencia" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -307,11 +332,9 @@
 
                     <div class="alert alert-info py-2 small border-0 mb-3">
                         {% if current_user.tipo in ['admin', 'gerente'] %}
-                        <i class="bi bi-lightning-fill me-1"></i> Esta transferência será executada
-                        <strong>imediatamente</strong>.
+                        <i class="bi bi-lightning-fill me-1"></i> Será executado imediatamente
                         {% else %}
-                        <i class="bi bi-hourglass-split me-1"></i> Esta solicitação será enviada para
-                        <strong>aprovação</strong>.
+                        <i class="bi bi-hourglass-split me-1"></i> Será enviado para aprovação
                         {% endif %}
                     </div>
 
@@ -526,9 +549,9 @@
             statusBadge.innerText = 'Indisponível';
             statusBadge.className = 'badge bg-danger';
 
-            btnConsumir.classList.add('d-none');
             btnCompra.classList.remove('d-none');
             msgCompra.classList.remove('d-none');
+            msgCompra.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Estoque insuficiente. Deseja solicitar compra?';
             qtdField.removeAttribute('max'); // Compra é livre
         }
     }
@@ -565,7 +588,7 @@
                     const actionHTML = `
                         <button onclick='abrirTransferenciaContexto(${JSON.stringify(data)})' 
                                 class="btn btn-sm btn-primary fw-bold text-white mt-2 w-100">
-                            <i class="bi bi-arrow-left-right me-1"></i> Solicitar Transferência
+                             Solicitar Transferência
                         </button>
                     `;
                     ToastModule.show(erro + actionHTML, 'warning', true);
@@ -574,7 +597,7 @@
                     const actionHTML = `
                         <button onclick='abrirCompraContexto(${JSON.stringify(data)})' 
                                 class="btn btn-sm btn-danger fw-bold mt-2 w-100">
-                            <i class="bi bi-cart-plus me-1"></i> Solicitar Compra
+                             Solicitar Compra
                         </button>
                     `;
                     ToastModule.show(erro + actionHTML, 'danger', true);

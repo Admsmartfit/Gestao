@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('ponto.index') }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('analytics.dashboard') }}">Analytics</a></li>
+<li class="breadcrumb-item active">Desempenho Técnico</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h2 class="mb-1">Jornada vs. Execução</h2>
+        <p class="mb-0 text-muted">Auditoria de produtividade, ociosidade e consumo por técnico.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-secondary btn-sm" onclick="exportarCSV()">
+            <i class="bi bi-download"></i> Exportar CSV
+        </button>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form id="formFiltros" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Unidade</label>
+                <select id="filtroUnidade" class="form-select">
+                    <option value="">Todas as Unidades</option>
+                    {% for u in unidades %}
+                    <option value="{{ u.id }}">{{ u.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Início</label>
+                <input type="date" id="dataInicio" class="form-control" value="{{ data_inicio_padrao }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Fim</label>
+                <input type="date" id="dataFim" class="form-control" value="{{ hoje.strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-primary w-100" onclick="carregarDesempenho()">
+                    Filtrar
+                </button>
+            </div>
+            <div class="col-12 mt-2">
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light btn-sm px-3" onclick="setPeriodo('atual')">Mês
+                        Atual</button>
+                    <button type="button" class="btn btn-light btn-sm px-3" onclick="setPeriodo('anterior')">Mês
+                        Anterior</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Técnico</th>
+                    <th class="text-center">Hrs Ponto</th>
+                    <th class="text-center">Hrs em OS</th>
+                    <th class="text-center">Ociosidade %</th>
+                    <th class="text-end">Consumo Peças</th>
+                    <th class="text-center">OS Concluídas</th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaCorpo">
+                <!-- Preenchido via JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Logs Diários -->
+<div class="modal fade" id="modalLogs" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-light border-0">
+                <h5 class="modal-title fw-bold" id="modalLogsTitulo">Audit de Jornada</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 border-bottom bg-white sticky-top">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small">Listagem detalhada de entradas e saídas.</span>
+                        <div class="badge bg-primary px-3 py-2" id="modalLogsBadgeQtd">0 Registros</div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Entrada</th>
+                                <th>Saída</th>
+                                <th class="text-center">Total Horas</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalLogsCorpo">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', carregarDesempenho);
+
+    async function carregarDesempenho() {
+        const unidade_id = document.getElementById('filtroUnidade').value;
+        const start_date = document.getElementById('dataInicio').value;
+        const end_date = document.getElementById('dataFim').value;
+
+        const params = new URLSearchParams({
+            unidade_id,
+            start_date,
+            end_date
+        });
+
+        const tabela = document.getElementById('tabelaCorpo');
+        tabela.innerHTML = `<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></td></tr>`;
+
+        try {
+            const res = await fetch(`/analytics/api/tecnicos/performance?${params}`);
+            const data = await res.json();
+
+            tabela.innerHTML = '';
+
+            if (data.length === 0) {
+                tabela.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">Nenhum dado encontrado para este período.</td></tr>`;
+                return;
+            }
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="fw-bold text-primary" style="cursor:pointer" onclick="abrirLogs(${row.tecnico_id}, '${row.tecnico_nome}')">
+                            ${row.tecnico_nome}
+                        </div>
+                        <small class="text-muted">ID: #${row.tecnico_id}</small>
+                    </td>
+                    <td class="text-center">${row.horas_ponto}h</td>
+                    <td class="text-center">${row.horas_os}h</td>
+                    <td class="text-center">
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <div class="progress w-50" style="height: 6px;">
+                                <div class="progress-bar ${row.ociosidade_percentual > 30 ? 'bg-danger' : 'bg-success'}" 
+                                     role="progressbar" style="width: ${row.ociosidade_percentual}%"></div>
+                            </div>
+                            <span class="small fw-bold">${row.ociosidade_percentual}%</span>
+                        </div>
+                    </td>
+                    <td class="text-end fw-bold">${formatMoeda(row.custo_pecas)}</td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary">${row.os_concluidas}</span>
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-icon text-primary p-2" onclick="abrirLogs(${row.tecnico_id}, '${row.tecnico_nome}')">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                `;
+                tabela.appendChild(tr);
+            });
+        } catch (e) {
+            tabela.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">Erro ao carregar dados.</td></tr>`;
+        }
+    }
+
+    async function abrirLogs(id, nome) {
+        document.getElementById('modalLogsTitulo').innerText = `Audit Jornada: ${nome}`;
+        const modal = new bootstrap.Modal(document.getElementById('modalLogs'));
+        modal.show();
+
+        const corpo = document.getElementById('modalLogsCorpo');
+        corpo.innerHTML = `<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>`;
+
+        const start_date = document.getElementById('dataInicio').value;
+        const end_date = document.getElementById('dataFim').value;
+        const params = new URLSearchParams({ start_date, end_date });
+
+        try {
+            const res = await fetch(`/analytics/api/tecnicos/${id}/logs-diarios?${params}`);
+            const data = await res.json();
+
+            corpo.innerHTML = '';
+            document.getElementById('modalLogsBadgeQtd').innerText = `${data.length} Registros`;
+
+            data.forEach(log => {
+                const tr = document.createElement('tr');
+                const statusBadge = log.status === 'normal'
+                    ? '<span class="badge bg-success opacity-75">8h OK</span>'
+                    : (log.status === 'insuficiente' ? '<span class="badge bg-danger opacity-75">Baixo</span>' : '<span class="badge bg-warning opacity-75">Extra</span>');
+
+                tr.innerHTML = `
+                    <td class="fw-medium">${log.data}</td>
+                    <td><span class="text-success fw-bold">${log.entrada}</span></td>
+                    <td><span class="text-danger fw-bold">${log.saida}</span></td>
+                    <td class="text-center fw-bold ${log.status === 'insuficiente' ? 'text-danger' : ''}">${log.total_horas}h</td>
+                    <td class="text-center">${statusBadge}</td>
+                `;
+                corpo.appendChild(tr);
+            });
+        } catch (e) {
+            corpo.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Erro ao carregar logs.</td></tr>`;
+        }
+    }
+
+    function exportarCSV() {
+        const unidade_id = document.getElementById('filtroUnidade').value;
+        const start_date = document.getElementById('dataInicio').value;
+        const end_date = document.getElementById('dataFim').value;
+
+        const params = new URLSearchParams({ unidade_id, start_date, end_date });
+        window.location.href = `/analytics/api/export/csv?${params}`;
+    }
+
+    function formatMoeda(valor) {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+    }
+
+    function setPeriodo(tipo) {
+        const now = new Date();
+        let start, end;
+
+        if (tipo === 'atual') {
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        } else if (tipo === 'anterior') {
+            start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            end = new Date(now.getFullYear(), now.getMonth(), 0);
+        }
+
+        document.getElementById('dataInicio').value = start.toISOString().split('T')[0];
+        document.getElementById('dataFim').value = end.toISOString().split('T')[0];
+        carregarDesempenho();
+    }
+</script>
+{% endblock %}

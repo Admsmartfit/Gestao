@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Configurações</a></li>
+<li class="breadcrumb-item active">Aprovação de Transferências</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Transferências de Estoque</h2>
+        <p class="mb-0 text-muted">Aprovação de solicitações entre unidades.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Solicitações Pendentes -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-warning"><i class="bi bi-hourglass-split me-2"></i>Solicitações Pendentes
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Item</th>
+                                <th>Origem</th>
+                                <th>Destino</th>
+                                <th>Qtd</th>
+                                <th>Solicitante</th>
+                                <th>Data</th>
+                                <th>Obs.</th>
+                                <th class="text-end pe-4">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sol in pendentes %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold">{{ sol.peca.nome }}</div>
+                                    <small class="text-muted">{{ sol.peca.codigo }}</small>
+                                </td>
+                                <td><span class="badge bg-secondary bg-opacity-10 text-secondary">{{ sol.origem.nome
+                                        }}</span></td>
+                                <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ sol.destino.nome
+                                        }}</span></td>
+                                <td class="fw-bold">{{ "{:g}".format(sol.quantidade) }} <small class="text-muted">{{
+                                        sol.peca.unidade_medida }}</small></td>
+                                <td>{{ sol.solicitante.nome }}</td>
+                                <td class="text-muted">{{ sol.data_solicitacao.strftime('%d/%m %H:%M') }}</td>
+                                <td class="small text-muted">{{ sol.observacao or '-' }}</td>
+                                <td class="text-end pe-4">
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                            onclick="rejeitarTransferencia('{{ sol.id }}')" title="Rejeitar">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-success"
+                                            onclick="aprovarTransferencia('{{ sol.id }}')" title="Aprovar">
+                                            <i class="bi bi-check-lg me-1"></i> Aprovar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="bi bi-check2-circle fs-1 d-block mb-2"></i>
+                                    Nenhuma solicitação pendente.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico Recente -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-secondary">Histórico Recente</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Item</th>
+                                <th>De -> Para</th>
+                                <th>Qtd</th>
+                                <th>Status</th>
+                                <th>Data Conclusão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sol in historico %}
+                            <tr>
+                                <td class="ps-4">{{ sol.peca.nome }}</td>
+                                <td class="small">{{ sol.origem.nome }} <i
+                                        class="bi bi-arrow-right mx-1 text-muted"></i> {{ sol.destino.nome }}</td>
+                                <td class="fw-bold">{{ "{:g}".format(sol.quantidade) }}</td>
+                                <td>
+                                    {% if sol.status == 'concluida' %}
+                                    <span class="badge bg-success bg-opacity-10 text-success"><i
+                                            class="bi bi-check2 me-1"></i>Concluída</span>
+                                    {% elif sol.status == 'rejeitada' %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger"><i
+                                            class="bi bi-x me-1"></i>Rejeitada</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ sol.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ sol.data_conclusao.strftime('%d/%m/%Y %H:%M') if
+                                    sol.data_conclusao else '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function aprovarTransferencia(id) {
+        if (!confirm('Deseja aprovar esta transferência? O estoque será movimentado imediatamente.')) return;
+
+        fetch(`/admin/api/transferencias/${id}/aprovar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    ToastModule.show("Transferência aprovada com sucesso!", "success");
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    ToastModule.show("Erro: " + data.erro, "danger");
+                }
+            })
+            .catch(() => ToastModule.show("Erro de conexão", "danger"));
+    }
+
+    function rejeitarTransferencia(id) {
+        if (!confirm('Deseja rejeitar esta solicitação?')) return;
+
+        fetch(`/admin/api/transferencias/${id}/rejeitar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    ToastModule.show("Solicitação rejeitada.", "warning");
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    ToastModule.show("Erro: " + data.erro, "danger");
+                }
+            })
+            .catch(() => ToastModule.show("Erro de conexão", "danger"));
+    }
+</script>
+{% endblock %}

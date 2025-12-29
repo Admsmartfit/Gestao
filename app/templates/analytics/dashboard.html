@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('ponto.index') }}">Dashboard</a></li>
+<li class="breadcrumb-item active">Analytics</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h2 class="mb-1">Analytics Executivo</h2>
+        <p class="mb-0 text-muted">Métricas de custos, performance e estoque em tempo real.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('analytics.desempenho_tecnico') }}"
+            class="btn btn-primary d-none d-md-flex align-items-center">
+            <i class="bi bi-people me-2"></i> Desempenho por Técnico
+        </a>
+        <select id="filtroUnidade" class="form-select w-auto" onchange="atualizarDashboard()">
+            <option value="">Todas as Unidades</option>
+            {% for u in unidades %}
+            <option value="{{ u.id }}">{{ u.nome }}</option>
+            {% endfor %}
+        </select>
+        <select id="filtroPeriodo" class="form-select w-auto" onchange="atualizarDashboard()">
+            <option value="7">Últimos 7 dias</option>
+            <option value="30" selected>Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+        </select>
+    </div>
+</div>
+
+<!-- Big Numbers Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded p-3">
+                        <i class="bi bi-currency-dollar fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Custo Total</div>
+                        <h4 class="mb-0 fw-bold" id="kpiCustoTotal">R$ 0,00</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-success bg-opacity-10 text-success rounded p-3">
+                        <i class="bi bi-clock-history fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">MTTR Médio</div>
+                        <h4 class="mb-0 fw-bold" id="kpiMTTR">0.0h</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-info bg-opacity-10 text-info rounded p-3">
+                        <i class="bi bi-check-circle fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Taxa Conclusão</div>
+                        <h4 class="mb-0 fw-bold" id="kpiTaxa">0%</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-danger bg-opacity-10 text-danger rounded p-3">
+                        <i class="bi bi-exclamation-triangle fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Itens Críticos</div>
+                        <h4 class="mb-0 fw-bold" id="kpiCriticos">0</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Gráfico de Evolução de Custos -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold">Evolução de Custos</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="chartCustos" style="max-height: 350px;"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Distribuição de Custos -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold">Estrutura de Gastos</h5>
+            </div>
+            <div class="card-body d-flex flex-column justify-content-center">
+                <canvas id="chartPizzaCustos" style="max-height: 250px;"></canvas>
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Peças:</span>
+                        <span class="fw-bold" id="txtCustoPecas">R$ 0,00</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Serviços:</span>
+                        <span class="fw-bold" id="txtCustoServicos">R$ 0,00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted small text-uppercase fw-bold mb-1">Valor Imobilizado</h6>
+                        <h3 class="mb-0" id="kpiImobilizado">R$ 0,00</h3>
+                    </div>
+                    <div class="bg-light p-3 rounded">
+                        <i class="bi bi-box-seam fs-2 text-muted"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted small text-uppercase fw-bold mb-1">Backlog Crítico (+7d)</h6>
+                        <h3 class="mb-0" id="kpiBacklog">0</h3>
+                    </div>
+                    <div class="bg-light p-3 rounded text-danger">
+                        <i class="bi bi-clock-history fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let chartCustos;
+    let chartPizza;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initCharts();
+        atualizarDashboard();
+    });
+
+    async function atualizarDashboard() {
+        const unidade_id = document.getElementById('filtroUnidade').value;
+        const days = document.getElementById('filtroPeriodo').value;
+        const params = `unidade_id=${unidade_id}&days=${days}`;
+
+        // 1. Atualizar KPIs
+        fetch(`/analytics/api/kpi/geral?${params}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('kpiCustoTotal').innerText = formatMoeda(data.custo_total);
+                document.getElementById('kpiMTTR').innerText = data.mttr + 'h';
+                document.getElementById('kpiTaxa').innerText = data.taxa_conclusao + '%';
+                document.getElementById('kpiCriticos').innerText = data.itens_criticos;
+                document.getElementById('kpiImobilizado').innerText = formatMoeda(data.valor_imobilizado);
+                document.getElementById('kpiBacklog').innerText = data.backlog_critico;
+
+                document.getElementById('txtCustoPecas').innerText = formatMoeda(data.custo_pecas);
+                document.getElementById('txtCustoServicos').innerText = formatMoeda(data.custo_servicos);
+
+                updatePizzaChart(data.custo_pecas, data.custo_servicos);
+            });
+
+        // 2. Atualizar Gráfico de Evolução
+        fetch(`/analytics/api/charts/custos?${params}`)
+            .then(res => res.json())
+            .then(data => {
+                chartCustos.data.labels = data.labels;
+                chartCustos.data.datasets[0].data = data.pecas;
+                chartCustos.data.datasets[1].data = data.servicos;
+                chartCustos.update();
+            });
+    }
+
+    function initCharts() {
+        const ctxCustos = document.getElementById('chartCustos').getContext('2d');
+        chartCustos = new Chart(ctxCustos, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Peças',
+                    data: [],
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                    fill: true,
+                    tension: 0.3
+                }, {
+                    label: 'Serviços',
+                    data: [],
+                    borderColor: '#1cc88a',
+                    backgroundColor: 'rgba(28, 200, 138, 0.05)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        const ctxPizza = document.getElementById('chartPizzaCustos').getContext('2d');
+        chartPizza = new Chart(ctxPizza, {
+            type: 'doughnut',
+            data: {
+                labels: ['Peças', 'Serviços'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#4e73df', '#1cc88a'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                cutout: '70%',
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    function updatePizzaChart(pecas, servicos) {
+        chartPizza.data.datasets[0].data = [pecas, servicos];
+        chartPizza.update();
+    }
+
+    function formatMoeda(valor) {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+    }
+</script>
+{% endblock %}

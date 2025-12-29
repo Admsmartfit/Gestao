@@ -221,7 +221,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold">Aprovar Compra</h5>
+                <h5 class="modal-title fw-bold">Aprovar Compra - <span id="aprovarNomeItemTitle"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body pt-4">
@@ -230,10 +230,6 @@
                 </div>
                 <form id="formAprovar">
                     <input type="hidden" id="aprovarPedidoId">
-                    <div class="mb-3">
-                        <label class="form-label">Item</label>
-                        <input type="text" class="form-control bg-light" id="aprovarNomeItem" readonly>
-                    </div>
                     <div class="mb-3">
                         <label class="form-label">Fornecedor</label>
                         <select id="fornecedorId" class="form-select" required onchange="atualizarDataPrevisao()">
@@ -251,8 +247,8 @@
                         <input type="date" id="dataChegada" class="form-control" required>
                     </div>
                     <div class="d-grid">
-                        <button type="button" onclick="confirmarAprovacao()" class="btn btn-success fw-bold py-2">
-                            Aprovar e Gerar Pedido
+                        <button type="button" onclick="aprovarPedidoSubmit()" class="btn btn-success fw-bold py-2">
+                            Confirmar Pedido
                         </button>
                     </div>
                 </form>
@@ -266,7 +262,8 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold">Confirmar Recebimento</h5>
+                <h5 class="modal-title fw-bold">Confirmar Recebimento - Pedido #<span
+                        id="receberPedidoIdDisplay"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body pt-4">
@@ -316,7 +313,7 @@
 
     function abrirModalAprovar(id, nome) {
         document.getElementById('aprovarPedidoId').value = id;
-        document.getElementById('aprovarNomeItem').value = nome;
+        document.getElementById('aprovarNomeItemTitle').innerText = nome;
         document.getElementById('formAprovar').reset();
         modalAprovar.show();
     }
@@ -333,13 +330,13 @@
         }
     }
 
-    async function confirmarAprovacao() {
+    async function aprovarPedidoSubmit() {
         const id = document.getElementById('aprovarPedidoId').value;
         const fornecedorId = document.getElementById('fornecedorId').value;
         const dataChegada = document.getElementById('dataChegada').value;
 
         if (!fornecedorId || !dataChegada) {
-            ToastModule.show("Preencha todos os campos.", "warning");
+            ToastModule.show("Selecione o fornecedor e a data.", "warning");
             return;
         }
 
@@ -383,10 +380,11 @@
         }
     }
 
-    function receberPedido(id, nome, qtd) {
+    function receberPedido(id, nome) {
         document.getElementById('receberPedidoId').value = id;
-        document.getElementById('receberResumoItem').innerText = `Pedido #${id} - ${nome}`;
-        document.getElementById('receberResumoQtd').innerText = `Quantidade: ${qtd}`;
+        document.getElementById('receberPedidoIdDisplay').innerText = id;
+        document.getElementById('receberResumoItem').innerText = nome;
+        // Buscamos a quantidade na tabela para o checklist de resumo
         modalReceber.show();
     }
 
@@ -400,9 +398,9 @@
             return;
         }
 
-        const originalText = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Processando...';
+        if (!confirm("O recebimento é irreversível e atualizará o estoque imediatamente. Confirmar?")) {
+            return;
+        }
 
         try {
             const res = await fetch(`/admin/api/compras/${id}/receber`, {

@@ -1,10 +1,13 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, abort, jsonify
+import csv
+import io
+from flask import Blueprint, render_template, request, flash, redirect, url_for, abort, jsonify, Response
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.models.models import Unidade, Usuario
-from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico, PedidoCompra, EstoqueSaldo, MovimentacaoEstoque
+from app.models.estoque_models import Equipamento, Fornecedor, CatalogoFornecedor, Estoque, OrdemServico, PedidoCompra, EstoqueSaldo, MovimentacaoEstoque, SolicitacaoTransferencia
 from datetime import datetime
 from app.models.terceirizados_models import Terceirizado
+from app.services.estoque_service import EstoqueService
 from app.extensions import db
 from sqlalchemy import func
 
@@ -27,7 +30,19 @@ def restrict_to_admin():
         if request.endpoint in ['admin.compras_painel', 'admin.aprovar_pedido', 'admin.rejeitar_pedido', 'admin.receber_pedido']:
             return
 
-    if not current_user.is_authenticated or current_user.tipo != 'admin':
+    # 3. Gerentes podem acessar painel de transferências e relatórios
+    if current_user.is_authenticated and current_user.tipo == 'gerente':
+        allowed_endpoints = [
+            'admin.transferencias_painel', 
+            'admin.aprovar_transferencia', 
+            'admin.rejeitar_transferencia',
+            'admin.relatorio_movimentacoes',
+            'admin.exportar_movimentacoes_csv'
+        ]
+        if request.endpoint in allowed_endpoints:
+            return
+
+    if not current_user.is_authenticated or current_user.tipo not in ['admin']:
         abort(403)
 
 @bp.route('/configuracoes', methods=['GET'])
@@ -372,7 +387,7 @@ def compras_painel():
     pendentes = PedidoCompra.query.filter_by(status='pendente').order_by(PedidoCompra.data_solicitacao.desc()).all()
     
     # Carrega pedidos aprovados/em andamento
-    aprovados = PedidoCompra.query.filter(PedidoCompra.status.in_(['aprovado', 'encomendado', 'solicitado'])).all()
+    aprovados = PedidoCompra.query.filter(PedidoCompra.status.in_(['aprovado', 'encomendado'])).all()
     
     # Histórico (concluidos ou cancelados)
     historico = PedidoCompra.query.filter(PedidoCompra.status.in_(['entregue', 'cancelado'])).order_by(PedidoCompra.data_solicitacao.desc()).limit(20).all()
@@ -518,3 +533,115 @@ def receber_pedido(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'erro': str(e)}), 500
+
+@bp.route('/transferencias', methods=['GET'])
+@login_required
+def transferencias_painel():
+    if current_user.tipo not in ['admin', 'gerente']:
+        abort(403)
+        
+    # Carrega solicitações pendentes
+    pendentes = SolicitacaoTransferencia.query.filter_by(status='pendente').order_by(SolicitacaoTransferencia.data_solicitacao.desc()).all()
+    
+    # Histórico recente
+    historico = SolicitacaoTransferencia.query.filter(SolicitacaoTransferencia.status != 'pendente').order_by(SolicitacaoTransferencia.data_solicitacao.desc()).limit(20).all()
+    
+    return render_template('admin/transferencias.html', 
+                         pendentes=pendentes, 
+                         historico=historico)
+
+@bp.route('/api/transferencias/<int:id>/aprovar', methods=['POST'])
+@login_required
+def aprovar_transferencia(id):
+    if current_user.tipo not in ['admin', 'gerente']:
+        return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
+        
+    try:
+        EstoqueService.aprovar_solicitacao_transferencia(id, current_user.id)
+        return jsonify({'success': True})
+    except ValueError as e:
+        return jsonify({'success': False, 'erro': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'erro': f"Erro interno: {str(e)}"}), 500
+
+@bp.route('/relatorios/movimentacoes', methods=['GET'])
+@login_required
+def relatorio_movimentacoes():
+    if current_user.tipo not in ['admin', 'gerente']:
+        abort(403)
+
+    # Filtros
+    unidade_id = request.args.get('unidade_id', type=int)
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    tipo = request.args.get('tipo')
+
+    query = MovimentacaoEstoque.query.join(Estoque)
+
+    if unidade_id:
+        query = query.filter(MovimentacaoEstoque.unidade_id == unidade_id)
+    if data_inicio:
+        query = query.filter(MovimentacaoEstoque.data_movimentacao >= datetime.strptime(data_inicio, '%Y-%m-%d'))
+    if data_fim:
+        # Adiciona 23:59:59 para pegar o dia inteiro
+        fim = datetime.strptime(data_fim, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        query = query.filter(MovimentacaoEstoque.data_movimentacao <= fim)
+    if tipo:
+        query = query.filter(MovimentacaoEstoque.tipo_movimentacao == tipo)
+
+    movimentacoes = query.order_by(MovimentacaoEstoque.data_movimentacao.desc()).all()
+    unidades = Unidade.query.filter_by(ativa=True).all()
+
+    return render_template('admin/relatorio_movimentacoes.html', 
+                         movimentacoes=movimentacoes, 
+                         unidades=unidades,
+                         filters=request.args)
+
+@bp.route('/relatorios/movimentacoes/exportar', methods=['GET'])
+@login_required
+def exportar_movimentacoes_csv():
+    if current_user.tipo not in ['admin', 'gerente']:
+        abort(403)
+
+    unidade_id = request.args.get('unidade_id', type=int)
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    tipo = request.args.get('tipo')
+
+    query = MovimentacaoEstoque.query.join(Estoque)
+
+    if unidade_id:
+        query = query.filter(MovimentacaoEstoque.unidade_id == unidade_id)
+    if data_inicio:
+        query = query.filter(MovimentacaoEstoque.data_movimentacao >= datetime.strptime(data_inicio, '%Y-%m-%d'))
+    if data_fim:
+        fim = datetime.strptime(data_fim, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        query = query.filter(MovimentacaoEstoque.data_movimentacao <= fim)
+    if tipo:
+        query = query.filter(MovimentacaoEstoque.tipo_movimentacao == tipo)
+
+    movimentacoes = query.order_by(MovimentacaoEstoque.data_movimentacao.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(['Data', 'Item', 'Tipo', 'Preço Unit.', 'Quantidade', 'Unidade', 'Usuário', 'Observação'])
+    
+    for m in movimentacoes:
+        writer.writerow([
+            m.data_movimentacao.strftime('%d/%m/%Y %H:%M'),
+            m.estoque.nome,
+            m.tipo_movimentacao.capitalize(),
+            f"{m.estoque.preco_unitario or 0:.2f}",
+            f"{m.quantidade:g}",
+            m.unidade.nome if m.unidade else '-',
+            m.usuario.nome,
+            m.observacao or '-'
+        ])
+
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": f"attachment; filename=movimentacoes_{datetime.now().strftime('%Y%m%d')}.csv"}
+    )

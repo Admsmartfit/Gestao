@@ -214,7 +214,7 @@ def solicitar_compra_peca(id):
         
         return jsonify({
             'success': True,
-            'mensagem': f'Solicitação de compra criada (Pedido #{novo_pedido.id}) para aprovação.'
+            'mensagem': f'Pedido #{novo_pedido.id} criado'
         })
 
     except Exception as e:
@@ -225,23 +225,33 @@ def solicitar_compra_peca(id):
 @login_required
 def entrada_estoque():
     """Registra entrada de novas peças (compra/reposição)."""
-    # Apenas gerentes ou admins (ou técnicos, dependendo da regra, aqui deixei aberto a logados)
     if current_user.tipo not in ['admin', 'gerente', 'tecnico', 'comprador']:
          return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
 
     data = request.get_json()
     try:
+        estoque_id = data.get('estoque_id')
+        quantidade = data.get('quantidade')
+        unidade_id = data.get('unidade_id')
+        motivo = data.get('motivo')
+        valor_novo = data.get('valor_novo')
+
+        if not estoque_id or not quantidade:
+            return jsonify({'success': False, 'erro': 'Dados incompletos'}), 400
+
         novo_saldo = EstoqueService.repor_estoque(
-            estoque_id=data['estoque_id'],
-            quantidade=data['quantidade'],
+            estoque_id=estoque_id,
+            quantidade=quantidade,
             usuario_id=current_user.id,
-            motivo=data.get('motivo'),
-            unidade_id=data.get('unidade_id'),
-            valor_novo=data.get('valor_novo')
+            motivo=motivo,
+            unidade_id=unidade_id,
+            valor_novo=valor_novo
         )
         return jsonify({'success': True, 'novo_saldo': float(novo_saldo)})
-    except Exception as e:
+    except ValueError as e:
         return jsonify({'success': False, 'erro': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'erro': f"Erro interno: {str(e)}"}), 500
 
 # [NOVA ROTA] Upload de Anexos em OS Aberta
 @bp.route('/<int:id>/anexos', methods=['POST'])
@@ -280,7 +290,8 @@ def disponibilidade_estoque(id):
             distribuicao.append({
                 'unidade_id': s.unidade_id,
                 'unidade_nome': s.unidade.nome,
-                'saldo': float(s.quantidade)
+                'saldo': float(s.quantidade),
+                'localizacao': s.localizacao or '-'
             })
             
     saldo_global = float(item.quantidade_atual)
@@ -351,7 +362,7 @@ def solicitar_compra():
         db.session.commit()
         return jsonify({
             'success': True, 
-            'mensagem': f'Solicitação de compra criada! (Pedido #{pedido.id})'
+            'mensagem': f'Pedido #{pedido.id} criado'
         })
     except Exception as e:
         return jsonify({'success': False, 'erro': str(e)}), 400
@@ -383,7 +394,7 @@ def solicitar_transferencia():
             aprovacao_automatica=aprovacao_automatica
         )
         
-        msg = 'Transferência realizada com sucesso!' if solicitacao.status == 'concluida' else 'Solicitação de transferência criada.'
+        msg = 'Transferência realizada com sucesso!' if solicitacao.status == 'concluida' else 'Solicitação criada'
         return jsonify({'success': True, 'msg': msg})
 
     except ValueError as e:
@@ -391,6 +402,10 @@ def solicitar_transferencia():
     except Exception as e:
         return jsonify({'success': False, 'erro': f"Erro interno: {str(e)}"}), 500
     
+# FUTURO: 
+# - Implementar painel de aprovação de transferências
+# - Notificação para solicitante quando aprovado
+
 # --- ROTA QUE ESTAVA FALTANDO ---
 @bp.route('/api/equipamentos/filtro')
 @login_required
@@ -510,5 +525,19 @@ def editar_os(id):
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao atualizar OS: {str(e)}', 'danger')
+        
+    return redirect(url_for('os.detalhes', id=id))
+
+@bp.route('/<int:id>/cancelar', methods=['POST'])
+@login_required
+def cancelar_os_route(id):
+    try:
+        EstoqueService.cancelar_os(id, current_user.id)
+        flash('Ordem de Serviço cancelada e estoque estornado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao cancelar OS: {str(e)}', 'danger')
         
     return redirect(url_for('os.detalhes', id=id))
