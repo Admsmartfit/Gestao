@@ -66,11 +66,16 @@ class ChamadoExterno(db.Model):
 class HistoricoNotificacao(db.Model):
     __tablename__ = 'historico_notificacoes'
     id = db.Column(db.Integer, primary_key=True)
-    chamado_id = db.Column(db.Integer, db.ForeignKey('chamados_externos.id'), nullable=False)
-    tipo = db.Column(db.String(20), nullable=False) # criacao, lembrete, cobranca
-    destinatario = db.Column(db.String(20), nullable=False)
+    chamado_id = db.Column(db.Integer, db.ForeignKey('chamados_externos.id'), nullable=True)
+    tipo = db.Column(db.String(20), nullable=False) # criacao, lembrete, cobranca, resposta_auto
+    remetente = db.Column(db.String(20), nullable=True) # Para inbound
+    destinatario = db.Column(db.String(20), nullable=True) # Pode ser null se inbound? Ou usamos para o 'sistema'
     mensagem = db.Column(db.Text, nullable=False)
     status_envio = db.Column(db.String(20), default='pendente') # pendente, enviado, falhou
     resposta_api = db.Column(db.Text) # JSON log
     tentativas = db.Column(db.Integer, default=0)
     enviado_em = db.Column(db.DateTime)
+    direcao = db.Column(db.String(10), default='outbound')
+    mensagem_hash = db.Column(db.String(64), index=True)
+    prioridade = db.Column(db.Integer, default=0, index=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)

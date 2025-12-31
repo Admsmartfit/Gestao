@@ -1,6 +1,7 @@
 :root {
     /* SaaS Modern Palette - Deep Blue & Slates */
-    --primary: #0f172a;
+    --primary: #000000;
+    /* Deepest Slate for higher contrast */
     /* Slate 900 - Sidebar background */
     --accent: #2563eb;
     /* Blue 600 - Primary actions */
@@ -85,8 +86,9 @@ p {
 /* Sidebar */
 .app-sidebar {
     width: var(--sidebar-width);
-    background-color: var(--primary);
+    background-color: var(--primary) !important;
     color: var(--text-on-dark);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -113,7 +115,7 @@ p {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.5);
     margin: 1.5rem 0 0.75rem 0.75rem;
     font-weight: 700;
 }
@@ -123,12 +125,12 @@ p {
     align-items: center;
     gap: 0.75rem;
     padding: 0.625rem 0.75rem;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
     border-radius: var(--radius-sm);
     transition: var(--transition);
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .nav-link-saas:hover {
@@ -145,7 +147,8 @@ p {
 /* Top Header */
 .app-header {
     height: var(--header-height);
-    background-color: var(--bg-surface);
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
     position: fixed;
     top: 0;
@@ -175,14 +178,6 @@ p {
 
 /* Mobile Adjustments */
 @media (max-width: 991.98px) {
-    .app-sidebar {
-        transform: translateX(-100%);
-    }
-
-    .app-sidebar.show {
-        transform: translateX(0);
-    }
-
     .app-header {
         left: 0;
         padding: 0 1rem;
@@ -235,6 +230,64 @@ p {
     border-bottom: none;
 }
 
+/* --- Responsive Stack: Table to Card --- */
+@media (max-width: 768px) {
+    .table-responsive-stack {
+        display: block;
+        width: 100%;
+    }
+
+    .table-responsive-stack thead {
+        display: none;
+        /* Hide headers */
+    }
+
+    .table-responsive-stack tbody,
+    .table-responsive-stack tr,
+    .table-responsive-stack td {
+        display: block;
+        width: 100%;
+    }
+
+    .table-responsive-stack tr {
+        margin-bottom: 1rem;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-md);
+        background: var(--bg-surface);
+        box-shadow: var(--shadow-sm);
+        padding: 0.5rem;
+    }
+
+    .table-responsive-stack td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+        padding: 0.75rem 0.5rem;
+        border-bottom: 1px solid var(--bg-main);
+    }
+
+    .table-responsive-stack td:last-child {
+        border-bottom: none;
+    }
+
+    .table-responsive-stack td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        text-align: left;
+        margin-right: 1rem;
+    }
+
+    /* Force buttons in cards to be full width if they are inside Actions td */
+    .table-responsive-stack td[data-label="Ações"] .dropdown,
+    .table-responsive-stack td[data-label="Ações"] .btn {
+        width: 100%;
+    }
+}
+
 
 /* --- Components: Buttons --- */
 .btn {
@@ -247,7 +300,8 @@ p {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-height: 40px;
+    min-height: 44px;
+    /* tactile min-height */
 }
 
 .btn-primary {
@@ -293,7 +347,8 @@ p {
 
 .form-control,
 .form-select {
-    height: 42px;
+    height: 44px;
+    /* tactile height */
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     font-size: 0.9375rem;

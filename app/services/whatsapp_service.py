@@ -2,88 +2,86 @@ import requests
 import json
 import re
 import time
-from datetime import datetime, timedelta
+import logging
 from flask import current_app
-# Assumindo uso de redis-py para persistência do estado do Circuit Breaker
-import redis
+from app.services.circuit_breaker import CircuitBreaker
+from app.services.rate_limiter import RateLimiter
+
+logger = logging.getLogger(__name__)
 
 class WhatsAppService:
-    _redis_client = None
-
-    @classmethod
-    def _get_redis(cls):
-        if cls._redis_client is None:
-            cls._redis_client = redis.from_url(current_app.config['CELERY_BROKER_URL'])
-        return cls._redis_client
 
     @staticmethod
-    def validar_telefone(telefone):
-        # Regex: ^\d{13}$ (ex: 5511999999999)
-        return bool(re.match(r'^\d{13}$', telefone))
+    def validar_telefone(telefone: str) -> bool:
+        """Valida formato: 5511999999999 (13 dígitos)"""
+        return bool(re.match(r'^55\d{11}$', str(telefone)))
 
     @classmethod
-    def check_circuit_breaker(cls):
-        r = cls._get_redis()
-        # Verifica se o circuito está aberto (pausado)
-        open_until = r.get('whatsapp_circuit_open_until')
-        if open_until and float(open_until) > time.time():
-            return False, f"Circuito aberto. Pausado até {datetime.fromtimestamp(float(open_until))}"
-        return True, "OK"
-
-    @classmethod
-    def record_failure(cls):
-        r = cls._get_redis()
-        # Incrementa falhas
-        failures = r.incr('whatsapp_api_failures')
-        if failures == 1:
-            r.expire('whatsapp_api_failures', 300) # Reset após 5 min se não atingir limite
-        
-        # Se 5 falhas seguidas, abre o circuito por 10 minutos
-        if failures >= 5:
-            r.set('whatsapp_circuit_open_until', time.time() + 600) # 10 min
-            r.delete('whatsapp_api_failures') # Reseta contagem
-            current_app.logger.critical("Circuit Breaker do WhatsApp ATIVADO por 10 minutos.")
-
-    @classmethod
-    def record_success(cls):
-        r = cls._get_redis()
-        r.delete('whatsapp_api_failures')
-
-    @classmethod
-    def enviar_mensagem(cls, telefone, texto):
+    def enviar_mensagem(cls, telefone: str, texto: str, prioridade: int = 0, notificacao_id: int = None):
         """
-        Envia mensagem via MegaAPI com validação e Circuit Breaker.
-        Retorna (sucesso: bool, resposta: dict/str)
+        Envia mensagem via MegaAPI com resiliência:
+        1. Validação de Telefone
+        2. Circuit Breaker check
+        3. Rate Limiting check (exceto para prioridade 2/Urgente)
+        4. API Request com Error Handling
         """
+        # 1. Validação
         if not cls.validar_telefone(telefone):
-            return False, {"error": "Número de telefone inválido. Formato: 5511999999999"}
+            return False, {"error": "Telefone inválido"}
 
-        # 1. Verificar Circuit Breaker
-        status, msg = cls.check_circuit_breaker()
-        if not status:
-            return False, {"error": msg, "code": "CIRCUIT_OPEN"}
+        # 2. Circuit Breaker
+        if not CircuitBreaker.should_attempt():
+            return False, {"error": "Circuit breaker OPEN", "code": "CIRCUIT_OPEN"}
 
-        url = current_app.config['MEGA_API_URL']
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {current_app.config['MEGA_API_KEY']}"
-        }
-        payload = {
-            "phone": telefone,
-            "message": texto
-        }
+        # 3. Rate Limit (ignorar se prioridade urgente >= 2)
+        if prioridade < 2:
+            pode_enviar, restantes = RateLimiter.check_limit()
+            if not pode_enviar:
+                logger.info(f"Rate limit reached. Enqueueing notification {notificacao_id} for later.")
+                if notificacao_id:
+                    # Circular import avoidance: import inside method
+                    from app.tasks.whatsapp_tasks import enviar_whatsapp_task
+                    enviar_whatsapp_task.apply_async(args=[notificacao_id], countdown=60)
+                return True, {"status": "enfileirado"}
 
+        # 4. Get Credentials
+        from app.models.whatsapp_models import ConfiguracaoWhatsApp
+        config = ConfiguracaoWhatsApp.query.filter_by(ativo=True).first()
+        
+        if config and config.api_key_encrypted:
+            try:
+                fernet_key = current_app.config.get('FERNET_KEY')
+                api_key = config.decrypt_key(fernet_key)
+                url = current_app.config.get('MEGA_API_URL')
+            except Exception as e:
+                logger.error(f"Error decrypting API Key: {str(e)}")
+                return False, {"error": "Decryption failed"}
+        else:
+            url = current_app.config.get('MEGA_API_URL')
+            api_key = current_app.config.get('MEGA_API_KEY')
+
+        if not url or not api_key:
+            return False, {"error": "MegaAPI configuration missing"}
+
+        # 5. API Request
         try:
-            # 2. POST com Timeout de 5s
-            response = requests.post(url, json=payload, headers=headers, timeout=5)
+            response = requests.post(
+                url,
+                json={"phone": telefone, "message": texto},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=5
+            )
             
-            if response.status_code == 200:
-                cls.record_success()
+            if response.status_code in [200, 201]:
+                CircuitBreaker.record_success()
+                RateLimiter.increment()
                 return True, response.json()
             else:
-                cls.record_failure()
+                CircuitBreaker.record_failure()
+                logger.warning(f"MegaAPI failure: {response.status_code} - {response.text}")
                 return False, {"status": response.status_code, "text": response.text}
-
+                
         except requests.exceptions.RequestException as e:
-            cls.record_failure()
+            CircuitBreaker.record_failure()
+            logger.error(f"MegaAPI request exception: {str(e)}")
             return False, {"error": str(e)}

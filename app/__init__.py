@@ -42,13 +42,16 @@ def create_app():
         return Usuario.query.get(int(user_id))
 
     # Registrar Blueprints
-    from app.routes import auth, ponto, admin, os, terceirizados, analytics
+    from app.routes import auth, ponto, admin, os, terceirizados, analytics, whatsapp, webhook, admin_whatsapp
     app.register_blueprint(auth.bp)
     app.register_blueprint(ponto.bp)
     app.register_blueprint(admin.bp)
     app.register_blueprint(os.bp)
     app.register_blueprint(terceirizados.bp) # Módulo 3
     app.register_blueprint(analytics.bp)
+    app.register_blueprint(whatsapp.bp)
+    app.register_blueprint(webhook.bp)
+    app.register_blueprint(admin_whatsapp.bp)
     
     from app.routes import search, notifications
     app.register_blueprint(search.bp)

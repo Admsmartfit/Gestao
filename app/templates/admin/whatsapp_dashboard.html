@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h4 fw-bold text-dark mb-0">Monitoramento WhatsApp</h2>
+            <div class="text-muted small">
+                Status Atual:
+                <span class="badge bg-{{ 'success' if config.status_saude == 'ok' else 'danger' }}">
+                    {{ config.status_saude|upper }}
+                </span>
+                <span class="ms-2">
+                    <i class="bi bi-clock"></i>
+                    {{ config.ultima_verificacao.strftime('%H:%M:%S') if config.ultima_verificacao else '--:--' }}
+                </span>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#testMessageModal">
+                <i class="bi bi-send me-1"></i> Testar Envio
+            </button>
+            <a href="{{ url_for('admin_whatsapp.listar_regras') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-robot me-1"></i> Regras
+            </a>
+            <a href="{{ url_for('admin_whatsapp.configuracao') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-gear me-1"></i> Configurações
+            </a>
+            <button class="btn btn-primary btn-sm" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise me-1"></i> Atualizar
+            </button>
+        </div>
+    </div>
+
+    <!-- Cards de Métricas -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="text-muted small text-uppercase fw-bold mb-1">Enviadas (24h)</h5>
+                    <h3 class="display-6 fw-bold text-primary mb-0">{{ total_enviadas }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="text-muted small text-uppercase fw-bold mb-1">Taxa de Sucesso</h5>
+                    <h3 class="display-6 fw-bold text-{{ 'success' if taxa_entrega >= 90 else 'warning' }} mb-0">
+                        {{ taxa_entrega }}%
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="text-muted small text-uppercase fw-bold mb-1">Fila Pendente</h5>
+                    <h3 class="display-6 fw-bold text-{{ 'danger' if mensagens_pendentes > 50 else 'dark' }} mb-0">
+                        {{ mensagens_pendentes }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small fw-bold">RATE LIMIT</span>
+                        <span class="badge bg-light text-dark">{{ rate_limit_disponivel }}/60</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-info" style="width: {{ (rate_limit_disponivel / 60) * 100 }}%">
+                        </div>
+                    </div>
+
+                    <div class="mt-3 d-flex justify-content-between align-items-center">
+                        <span class="text-muted small fw-bold">CIRCUIT BREAKER</span>
+                        {% if cb_state == 'CLOSED' %}
+                        <span class="badge bg-success">CLOSED</span>
+                        {% elif cb_state == 'OPEN' %}
+                        <span class="badge bg-danger">OPEN</span>
+                        {% else %}
+                        <span class="badge bg-warning">HALF-OPEN</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Gráfico de Envios -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="h6 fw-bold mb-0">Volume de Envios</h5>
+                    <select class="form-select form-select-sm w-auto" id="graficoPeriodo" onchange="carregarGrafico()">
+                        <option value="dia">Hoje (Hora a Hora)</option>
+                        <option value="semana">Últimos 7 Dias</option>
+                    </select>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartEnvios" style="height: 300px; width: 100%;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Histórico Recente -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0">
+                    <h5 class="h6 fw-bold mb-0">Histórico Recente</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 340px; overflow-y: auto;">
+                        <table class="table table-hover mb-0 small">
+                            <tbody id="tabelaHistorico">
+                                <!-- Preenchido via AJAX -->
+                                <tr>
+                                    <td class="text-center text-muted py-3">Carregando...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Message Modal -->
+<div class="modal fade" id="testMessageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title h6 fw-bold">Enviar Mensagem de Teste</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="testMessageForm">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Telefone</label>
+                        <input type="text" id="testPhone" class="form-control" placeholder="5511999999999" required>
+                        <div class="form-text small">Use o formato internacional (55 + DDD + Número) sem espaços ou
+                            símbolos.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Mensagem</label>
+                        <textarea id="testText" class="form-control" rows="3" placeholder="Olá, isto é um teste do GMM."
+                            required></textarea>
+                    </div>
+                    <div id="testFeedback" class="d-none alert alert-light small mb-0"></div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="sendTestMessage()">
+                    <i class="bi bi-send me-2"></i> Enviar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let chartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarGrafico();
+        atualizarHistorico();
+        setInterval(atualizarHistorico, 10000); // Poll feed every 10s
+        setInterval(carregarGrafico, 60000);    // refresh chart every min
+    });
+
+    function sendTestMessage() {
+        const btn = document.querySelector('#testMessageModal .btn-primary');
+        const feedback = document.getElementById('testFeedback');
+        const phone = document.getElementById('testPhone').value;
+        const msg = document.getElementById('testText').value;
+
+        if (!phone || !msg) {
+            alert('Preencha todos os campos!');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Enviando...';
+        feedback.className = 'd-none alert alert-light small mb-0';
+
+        fetch('/api/whatsapp/teste', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefone: phone, mensagem: msg })
+        })
+            .then(res => res.json())
+            .then(data => {
+                feedback.classList.remove('d-none');
+                if (data.success) {
+                    feedback.className = 'alert alert-success small mb-0';
+                    feedback.innerHTML = '<i class="bi bi-check-circle me-1"></i> Mensagem enviada com sucesso!';
+                    document.getElementById('testMessageForm').reset();
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('testMessageModal'));
+                        modal.hide();
+                        atualizarHistorico(); // Refresh list immediately
+                    }, 1500);
+                } else {
+                    feedback.className = 'alert alert-danger small mb-0';
+                    feedback.innerText = 'Erro: ' + (data.error || 'Falha desconhecida');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                feedback.className = 'alert alert-danger small mb-0';
+                feedback.innerText = 'Erro de conexão.';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send me-2"></i> Enviar';
+            });
+    }
+
+    function carregarGrafico() {
+        const periodo = document.getElementById('graficoPeriodo').value;
+        const ctx = document.getElementById('chartEnvios').getContext('2d');
+
+        fetch(`/api/whatsapp/metricas-grafico?periodo=${periodo}`)
+            .then(res => res.json())
+            .then(data => {
+                if (chartInstance) chartInstance.destroy();
+
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Enviadas',
+                            data: data.enviadas,
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }, {
+                            label: 'Entregues',
+                            data: data.entregues,
+                            borderColor: '#198754',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom' } },
+                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            });
+    }
+
+    function atualizarHistorico() {
+        fetch('/api/whatsapp/historico-recente')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById('tabelaHistorico');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td class="text-center text-muted py-3">Nenhum registro recente.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td class="text-nowrap text-muted" style="width: 60px;">${item.hora}</td>
+                    <td style="width: 40px;">
+                        <span class="badge bg-${item.direcao === 'outbound' ? 'primary' : 'info'} rounded-pill">
+                            ${item.direcao === 'outbound' ? '<i class="bi bi-arrow-up-right"></i>' : '<i class="bi bi-arrow-down-left"></i>'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-truncate" style="max-width: 120px;">${item.tipo}</div>
+                        <div class="text-muted" style="font-size: 0.8em;">...${item.destinatario}</div>
+                    </td>
+                    <td class="text-end">
+                        <span class="badge bg-${getStatusColor(item.status)}">
+                            ${item.status}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+            });
+    }
+
+    function getStatusColor(status) {
+        if (['enviado', 'entregue', 'recebido'].includes(status)) return 'success';
+        if (['falhou', 'erro'].includes(status)) return 'danger';
+        return 'warning';
+    }
+</script>
+{% endblock %}

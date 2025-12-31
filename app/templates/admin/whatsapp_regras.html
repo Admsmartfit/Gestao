@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 fw-bold text-dark mb-0">Automação WhatsApp</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaRegra">
+            <i class="bi bi-plus-lg me-2"></i>Nova Regra
+        </button>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Prioridade</th>
+                            <th>Gatilho (Palavra-chave)</th>
+                            <th>Correspondência</th>
+                            <th>Ação</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for regra in regras %}
+                        <tr>
+                            <td class="ps-4">{{ regra.prioridade }}</td>
+                            <td><code class="px-2 py-1 bg-light rounded">{{ regra.palavra_chave }}</code></td>
+                            <td>
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary">
+                                    {{ regra.tipo_correspondencia }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if regra.acao == 'responder' %}
+                                <span class="text-primary"><i class="bi bi-chat-dots me-1"></i> Responder</span>
+                                {% elif regra.acao == 'encaminhar' %}
+                                <span class="text-warning"><i class="bi bi-box-arrow-in-right me-1"></i> Encaminhar ({{
+                                    regra.encaminhar_para_perfil }})</span>
+                                {% elif regra.acao == 'executar_funcao' %}
+                                <span class="text-info"><i class="bi bi-gear me-1"></i> Executar ({{
+                                    regra.funcao_sistema }})</span>
+                                {% else %}
+                                {{ regra.acao }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if regra.ativo else 'secondary' }}">
+                                    {{ 'Ativo' if regra.ativo else 'Inativo' }}
+                                </span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <button class="btn btn-sm btn-link text-muted p-0"
+                                    onclick="editarRegra({{ regra.id }})">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-robot display-4 d-block mb-3 opacity-25"></i>
+                                Nenhuma regra de automação configurada.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Regra -->
+<div class="modal fade" id="modalNovaRegra">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold">Nova Regra de Automação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="formRegra">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Gatilho</label>
+                        <input type="text" class="form-control" id="palavraChave" placeholder="Ex: #COMPRA, SIM, Preço"
+                            required>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Tipo de Match</label>
+                            <select class="form-select" id="tipoMatch">
+                                <option value="contem">Contém texto</option>
+                                <option value="exato">Igual a</option>
+                                <option value="regex">Expressão Regular</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Prioridade</label>
+                            <input type="number" class="form-control" id="prioridade" value="0">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Ação</label>
+                        <select class="form-select" id="acao" onchange="toggleCampos()">
+                            <option value="responder">Responder com Texto</option>
+                            <option value="encaminhar">Encaminhar para Departamento</option>
+                            <option value="executar_funcao">Executar Função do Sistema</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 bg-light p-3 rounded" id="campoResposta">
+                        <label class="form-label small fw-bold">Mensagem de Resposta</label>
+                        <textarea class="form-control border-0" id="respostaTexto" rows="3"
+                            placeholder="Digite a resposta automática..."></textarea>
+                    </div>
+
+                    <div class="mb-3 d-none bg-light p-3 rounded" id="campoEncaminhar">
+                        <label class="form-label small fw-bold">Encaminhar para</label>
+                        <select class="form-select border-0" id="encaminharPara">
+                            <option value="admin">Administrador</option>
+                            <option value="comprador">Comprador</option>
+                            <option value="gerente">Gerente</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 d-none bg-light p-3 rounded" id="campoFuncao">
+                        <label class="form-label small fw-bold">Nome da Função</label>
+                        <input type="text" class="form-control border-0" id="funcaoSistema"
+                            placeholder="Ex: criar_pedido">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-link text-muted text-decoration-none"
+                    data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary px-4" onclick="salvarRegra()">Salvar Regra</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleCampos() {
+        const acao = document.getElementById('acao').value;
+        document.getElementById('campoResposta').classList.add('d-none');
+        document.getElementById('campoEncaminhar').classList.add('d-none');
+        document.getElementById('campoFuncao').classList.add('d-none');
+
+        if (acao === 'responder') {
+            document.getElementById('campoResposta').classList.remove('d-none');
+        } else if (acao === 'encaminhar') {
+            document.getElementById('campoEncaminhar').classList.remove('d-none');
+        } else if (acao === 'executar_funcao') {
+            document.getElementById('campoFuncao').classList.remove('d-none');
+        }
+    }
+
+    function salvarRegra() {
+        const dados = {
+            palavra_chave: document.getElementById('palavraChave').value,
+            tipo_correspondencia: document.getElementById('tipoMatch').value,
+            acao: document.getElementById('acao').value,
+            resposta_texto: document.getElementById('respostaTexto').value,
+            encaminhar_para_perfil: document.getElementById('encaminharPara').value,
+            funcao_sistema: document.getElementById('funcaoSistema').value,
+            prioridade: parseInt(document.getElementById('prioridade').value)
+        };
+
+        fetch('/admin/whatsapp/regras', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Erro: ' + (data.error || 'Desconhecido'));
+                }
+            });
+    }
+</script>
+{% endblock %}

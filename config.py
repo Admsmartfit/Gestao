@@ -20,3 +20,7 @@ class Config:
     
     MEGA_API_KEY = os.environ.get('MEGA_API_KEY')
     MEGA_API_URL = "https://api.megaapi.com.br/v1/messages/send"
+    
+    FERNET_KEY = os.environ.get('FERNET_KEY') or '00000000000000000000000000000000'
+    
+    CELERY_IMPORTS = ('app.tasks',)

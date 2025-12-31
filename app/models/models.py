@@ -8,6 +8,9 @@ class Unidade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), unique=True, nullable=False)
     endereco = db.Column(db.String(255), nullable=True)
+    razao_social = db.Column(db.String(150), nullable=True)
+    cnpj = db.Column(db.String(20), nullable=True)
+    telefone = db.Column(db.String(20), nullable=True)
     faixa_ip_permitida = db.Column(db.String(255), nullable=False)
     ssid_wifi = db.Column(db.String(50), nullable=True) # [Novo PRD 3.1.1]
     ativa = db.Column(db.Boolean, default=True)

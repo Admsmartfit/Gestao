@@ -239,6 +239,18 @@
                         <label class="form-label">Endereço</label>
                         <input type="text" name="endereco" class="form-control">
                     </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Razão Social</label>
+                        <input type="text" name="razao_social" class="form-control" placeholder="Empresa XYZ Ltda">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">CNPJ</label>
+                        <input type="text" name="cnpj" class="form-control" placeholder="00.000.000/0000-00">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Telefone</label>
+                        <input type="text" name="telefone" class="form-control" placeholder="(11) 1234-5678">
+                    </div>
                     <div class="col-md-2">
                         <label class="form-label">IP Permitido</label>
                         <input type="text" name="faixa_ip" class="form-control" placeholder="192.168..." required>
@@ -257,6 +269,9 @@
                         <tr>
                             <th class="ps-4">Nome</th>
                             <th>Endereço</th>
+                            <th>Razão Social</th>
+                            <th>CNPJ</th>
+                            <th>Telefone</th>
                             <th>IPs Permitidos</th>
                         </tr>
                     </thead>
@@ -265,6 +280,9 @@
                         <tr>
                             <td class="ps-4 fw-bold" data-label="Nome">{{ u.nome }}</td>
                             <td data-label="Endereço">{{ u.endereco or '-' }}</td>
+                            <td data-label="Razão Social">{{ u.razao_social or '-' }}</td>
+                            <td data-label="CNPJ">{{ u.cnpj or '-' }}</td>
+                            <td data-label="Telefone">{{ u.telefone or '-' }}</td>
                             <td data-label="IPs"><code
                                     class="bg-light px-2 py-1 rounded text-dark">{{ u.faixa_ip_permitida }}</code></td>
                         </tr>

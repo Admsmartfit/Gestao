@@ -178,9 +178,12 @@ def novo_equipamento():
 @login_required
 def nova_unidade():
     nova_un = Unidade(
-        nome=request.form.get('nome'), 
-        endereco=request.form.get('endereco'), 
-        faixa_ip_permitida=request.form.get('faixa_ip')
+        nome=request.form.get('nome'),
+        endereco=request.form.get('endereco'),
+        faixa_ip_permitida=request.form.get('faixa_ip'),
+        razao_social=request.form.get('razao_social'),
+        cnpj=request.form.get('cnpj'),
+        telefone=request.form.get('telefone')
     )
     db.session.add(nova_un)
     db.session.commit()
