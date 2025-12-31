@@ -39,69 +39,77 @@
 
             <div class="sidebar-nav">
                 {% if current_user.is_authenticated %}
+
                 <div class="nav-group">
-                    <div class="nav-group-title">Principal</div>
+                    <div class="nav-group-title">Atendimento</div>
                     <a href="{{ url_for('ponto.index') }}"
                         class="nav-link-saas {{ 'active' if request.endpoint == 'ponto.index' }}">
                         <i class="bi bi-speedometer2"></i> Dashboard
                     </a>
-                    {% if current_user.tipo in ['admin', 'gerente', 'comprador'] %}
-                    <a href="{{ url_for('analytics.dashboard') }}"
-                        class="nav-link-saas {{ 'active' if request.endpoint == 'analytics.dashboard' }}">
-                        <i class="bi bi-pie-chart-fill"></i> Analytics
+                    <a href="{{ url_for('os.nova_os') }}"
+                        class="nav-link-saas {{ 'active' if request.endpoint == 'os.nova_os' }}">
+                        <i class="bi bi-plus-circle"></i> Nova OS
                     </a>
-                    {% endif %}
-                </div>
-
-                <div class="nav-group">
-                    <div class="nav-group-title">Operacional</div>
                     <a href="{{ url_for('ponto.index') }}#minhas-os" class="nav-link-saas">
-                        <i class="bi bi-tools"></i> Minhas OS
-                    </a>
-                    <a href="{{ url_for('ponto.index') }}" class="nav-link-saas">
-                        <i class="bi bi-stopwatch"></i> Ponto
+                        <i class="bi bi-tools"></i> Minhas Tarefas
                     </a>
                 </div>
 
                 <div class="nav-group">
-                    <div class="nav-group-title">Gestão</div>
-                    <a href="{{ url_for('os.painel_estoque') }}"
-                        class="nav-link-saas {{ 'active' if request.endpoint == 'os.painel_estoque' }}">
-                        <i class="bi bi-box-seam"></i> Estoque
+                    <div class="nav-group-title">Recursos</div>
+                    <a href="{{ url_for('equipamentos.listar') }}"
+                        class="nav-link-saas {{ 'active' if 'equipamentos' in request.endpoint }}">
+                        <i class="bi bi-hdd-network"></i> Equipamentos
                     </a>
-                    {% if current_user.tipo in ['admin', 'comprador'] %}
+                    <a href="{{ url_for('os.painel_estoque') }}"
+                        class="nav-link-saas {{ 'active' if 'estoque' in request.endpoint }}">
+                        <i class="bi bi-box-seam"></i> Estoque Global
+                    </a>
+                    {% if current_user.tipo in ['admin', 'comprador', 'gerente'] %}
                     <a href="{{ url_for('admin.compras_painel') }}"
-                        class="nav-link-saas {{ 'active' if request.endpoint == 'admin.compras_painel' }}">
+                        class="nav-link-saas {{ 'active' if 'compras' in request.endpoint }}">
                         <i class="bi bi-cart3"></i> Compras
                     </a>
-                    {% endif %}
-                    {% if current_user.tipo in ['admin', 'gerente'] %}
                     <a href="{{ url_for('admin.transferencias_painel') }}"
-                        class="nav-link-saas {{ 'active' if request.endpoint == 'admin.transferencias_painel' }}">
+                        class="nav-link-saas {{ 'active' if 'transferencias' in request.endpoint }}">
                         <i class="bi bi-arrow-left-right"></i> Transferências
                     </a>
                     {% endif %}
-                    {% if current_user.tipo in ['admin', 'gerente', 'comprador'] %}
-                    <a href="{{ url_for('admin.relatorio_movimentacoes') }}"
-                        class="nav-link-saas {{ 'active' if request.endpoint == 'admin.relatorio_movimentacoes' }}">
-                        <i class="bi bi-file-earmark-text"></i> Relatórios
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-group-title">Externo</div>
+                    <a href="{{ url_for('terceirizados.listar_chamados') }}"
+                        class="nav-link-saas {{ 'active' if 'terceirizados' in request.endpoint }}">
+                        <i class="bi bi-headset"></i> Chamados & Chat
+                    </a>
+                    {% if current_user.tipo in ['admin', 'gerente'] %}
+                    <a href="{{ url_for('admin.dashboard', tab='terceirizados') }}" class="nav-link-saas">
+                        <i class="bi bi-people"></i> Prestadores
                     </a>
                     {% endif %}
                 </div>
 
+                {% if current_user.tipo in ['admin', 'gerente'] %}
                 <div class="nav-group">
-                    <div class="nav-group-title">Configurações</div>
+                    <div class="nav-group-title">Gestão</div>
+                    <a href="{{ url_for('analytics.dashboard') }}"
+                        class="nav-link-saas {{ 'active' if 'analytics' in request.endpoint }}">
+                        <i class="bi bi-pie-chart-fill"></i> Analytics
+                    </a>
                     {% if current_user.tipo == 'admin' %}
                     <a href="{{ url_for('admin.dashboard') }}"
                         class="nav-link-saas {{ 'active' if request.endpoint == 'admin.dashboard' }}">
-                        <i class="bi bi-gear"></i> Admin Panel
+                        <i class="bi bi-gear"></i> Configurações
                     </a>
                     <a href="{{ url_for('admin_whatsapp.dashboard') }}"
                         class="nav-link-saas {{ 'active' if 'whatsapp' in request.endpoint }}">
-                        <i class="bi bi-whatsapp"></i> WhatsApp
+                        <i class="bi bi-whatsapp"></i> WhatsApp Bot
                     </a>
                     {% endif %}
                 </div>
+                {% endif %}
+
                 {% endif %}
             </div>
 
@@ -113,7 +121,6 @@
             </div>
             {% endif %}
         </aside>
-
         <!-- Main Content -->
         <div class="main-wrapper">
             <!-- Header -->

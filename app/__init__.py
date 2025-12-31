@@ -5,8 +5,6 @@ from celery import Celery
 from config import Config
 from datetime import datetime
 
-
-
 def make_celery(app):
     celery = Celery(
         app.import_name,
@@ -22,7 +20,6 @@ def make_celery(app):
     return celery
 
 def create_app():
-
     app = Flask(__name__)
     app.config.from_object('config.Config')
 
@@ -42,22 +39,40 @@ def create_app():
         return Usuario.query.get(int(user_id))
 
     # Registrar Blueprints
-    from app.routes import auth, ponto, admin, os, terceirizados, analytics, whatsapp, webhook, admin_whatsapp
+    # Importamos todos os módulos de rotas aqui para evitar erros de importação circular
+    from app.routes import (
+        auth, 
+        ponto, 
+        admin, 
+        os, 
+        terceirizados, 
+        analytics, 
+        whatsapp, 
+        webhook, 
+        admin_whatsapp, 
+        equipamentos, 
+        search, 
+        notifications
+    )
+    
     app.register_blueprint(auth.bp)
     app.register_blueprint(ponto.bp)
     app.register_blueprint(admin.bp)
     app.register_blueprint(os.bp)
-    app.register_blueprint(terceirizados.bp) # Módulo 3
+    app.register_blueprint(terceirizados.bp)
     app.register_blueprint(analytics.bp)
     app.register_blueprint(whatsapp.bp)
     app.register_blueprint(webhook.bp)
     app.register_blueprint(admin_whatsapp.bp)
     
-    from app.routes import search, notifications
+    # Novo Módulo de Equipamentos
+    app.register_blueprint(equipamentos.bp)
+    
+    # Módulos de Utilidade
     app.register_blueprint(search.bp)
     app.register_blueprint(notifications.bp)
     
-    # --- CORREÇÃO: ROTA RAIZ (ROOT) ---
+    # Rota Raiz
     @app.route('/')
     def root():
         # Redireciona automaticamente para o login

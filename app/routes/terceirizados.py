@@ -1,3 +1,4 @@
+from app.models.terceirizados_models import HistoricoNotificacao # Certifique-se que já está importado
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime
@@ -101,6 +102,20 @@ def criar_chamado():
         flash(f'Erro interno ao criar chamado: {str(e)}', 'danger')
         
     return redirect(url_for('terceirizados.listar_chamados'))
+
+@bp.route('/chamados/<int:id>', methods=['GET'])
+@login_required
+def detalhes_chamado(id):
+    """Exibe detalhes e timeline de comunicação do chamado (RF-005)"""
+    chamado = ChamadoExterno.query.get_or_404(id)
+    
+    # Carregar histórico de mensagens (ordenado por data)
+    mensagens = HistoricoNotificacao.query.filter_by(chamado_id=id)\
+        .order_by(HistoricoNotificacao.criado_em.asc()).all()
+    
+    return render_template('chamado_detalhe.html', 
+                         chamado=chamado, 
+                         mensagens=mensagens)
 
 @bp.route('/chamados/<int:id>/cobrar', methods=['POST'])
 @login_required

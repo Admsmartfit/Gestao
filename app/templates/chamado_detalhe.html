@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Estilos específicos para o chat */
+    .chat-bubble {
+        max-width: 70%;
+        border-radius: 12px;
+    }
+
+    /* Define as cores via classe, evitando lógica dentro do style="" */
+    .chat-outbound {
+        background-color: #dcf8c6;
+        /* Verde WhatsApp */
+    }
+
+    .chat-inbound {
+        background-color: #fff;
+        border: 1px solid #e2e8f0;
+        /* Borda suave para diferenciar do fundo */
+    }
+</style>
+
+<div class="row h-100 g-0" style="min-height: calc(100vh - 100px);">
+    <div class="col-md-4 border-end bg-white h-100 overflow-auto">
+        <div class="p-4">
+            <a href="{{ url_for('terceirizados.listar_chamados') }}"
+                class="text-decoration-none text-muted small mb-3 d-block">
+                <i class="bi bi-arrow-left"></i> Voltar para Lista
+            </a>
+
+            <h4 class="fw-bold mb-1">{{ chamado.titulo }}</h4>
+            <span class="badge bg-{{ 'success' if chamado.status == 'concluido' else 'warning' }} mb-3">
+                {{ chamado.status|upper }}
+            </span>
+
+            <div class="card bg-light border-0 mb-3">
+                <div class="card-body">
+                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Prestador</small>
+                    <div class="fw-bold">{{ chamado.terceirizado.nome }}</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-whatsapp text-success"></i>
+                        {{ chamado.terceirizado.telefone }}
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold mt-4">Descrição</h6>
+            <p class="text-muted small bg-light p-3 rounded">{{ chamado.descricao }}</p>
+
+            <div class="row g-2 mb-4">
+                <div class="col-6">
+                    <small class="text-muted d-block">Prazo</small>
+                    <strong>{{ chamado.prazo_combinado.strftime('%d/%m %H:%M') }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Prioridade</small>
+                    <strong>{{ chamado.prioridade|capitalize }}</strong>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+                {% if chamado.status != 'concluido' %}
+                <button class="btn btn-outline-danger" onclick="cobrar('{{ chamado.id }}', this)">
+                    <i class="bi bi-bell me-2"></i>Enviar Cobrança
+                </button>
+                <button class="btn btn-success">Concluir Chamado</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8 d-flex flex-column h-100 bg-light">
+        <div class="p-3 border-bottom bg-white fw-bold text-muted d-flex align-items-center gap-2">
+            <i class="bi bi-chat-text-fill text-primary"></i> Histórico de Comunicação
+        </div>
+
+        <div class="flex-grow-1 p-4 overflow-auto" id="chatContainer" style="background-color: #e5ddd5;">
+            {% for msg in mensagens %}
+            <div
+                class="d-flex mb-3 {{ 'justify-content-end' if msg.direcao == 'outbound' else 'justify-content-start' }}">
+                <div
+                    class="card border-0 shadow-sm chat-bubble {{ 'chat-outbound' if msg.direcao == 'outbound' else 'chat-inbound' }}">
+                    <div class="card-body p-2 px-3">
+                        <div class="small mb-1 text-dark" style="white-space: pre-wrap;">{{ msg.mensagem }}</div>
+                        <div class="d-flex align-items-center justify-content-end gap-1 opacity-50"
+                            style="font-size: 0.65rem;">
+                            <span>{{ msg.criado_em.strftime('%H:%M') }}</span>
+                            {% if msg.direcao == 'outbound' %}
+                            <i
+                                class="bi bi-check2-all {{ 'text-primary' if msg.status_envio == 'entregue' or msg.status_envio == 'enviado' else '' }}"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-chat-square-dots fs-1 d-block mb-2 opacity-25"></i>
+                <p>Nenhuma mensagem trocada ainda.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="p-3 bg-white border-top">
+            <div class="input-group">
+                <input type="text" class="form-control bg-light" placeholder="Digite uma mensagem manual (em breve)..."
+                    disabled>
+                <button class="btn btn-primary" disabled><i class="bi bi-send"></i></button>
+            </div>
+            <div class="form-text small mt-1 text-muted">Use os botões de ação na esquerda para enviar notificações
+                padrão.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Scroll para o fim do chat ao carregar
+    document.addEventListener("DOMContentLoaded", function () {
+        const chatContainer = document.getElementById('chatContainer');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    });
+
+    // Função de cobrança
+    function cobrar(id, btn) {
+        if (confirm("Enviar cobrança automática via WhatsApp?")) {
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Enviando...';
+
+            fetch(`/terceirizados/chamados/${id}/cobrar`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (typeof ToastModule !== 'undefined') {
+                        ToastModule.show(data.msg, data.success ? 'success' : 'danger');
+                    } else {
+                        alert(data.msg);
+                    }
+                    if (data.success) setTimeout(() => location.reload(), 1000);
+                })
+                .catch(err => {
+                    alert("Erro de conexão.");
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                });
+        }
+    }
+</script>
+{% endblock %}

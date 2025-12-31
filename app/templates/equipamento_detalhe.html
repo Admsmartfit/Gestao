@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('equipamentos.listar') }}">Equipamentos</a></li>
+<li class="breadcrumb-item active">{{ eq.nome }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <h2 class="fw-bold mb-0">{{ eq.nome }}</h2>
+        <div class="text-muted small mt-1">
+            <span class="badge bg-light text-dark border me-2">{{ eq.categoria }}</span>
+            <i class="bi bi-geo-alt me-1"></i> {{ eq.unidade.nome }}
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('os.nova_os', equipamento_id=eq.id) }}" class="btn btn-primary">
+            <i class="bi bi-tools me-2"></i>Abrir OS
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <div class="small text-muted fw-bold text-uppercase">Custo Total (Peças)</div>
+            <div class="fs-4 fw-bold text-dark">R$ {{ "{:.2f}".format(kpis.custo_total) }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <div class="small text-muted fw-bold text-uppercase">Intervenções</div>
+            <div class="fs-4 fw-bold text-primary">{{ kpis.qtd_os }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <div class="small text-muted fw-bold text-uppercase">MTBF Estimado</div>
+            <div class="fs-4 fw-bold text-success">{{ kpis.mtbf }}</div>
+            <small class="text-muted" style="font-size: 0.7rem;">Tempo médio entre falhas corretivas</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-bold py-3 border-bottom-0">Histórico de Manutenções</div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">OS / Data</th>
+                            <th>Tipo</th>
+                            <th>Problema / Solução</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for os in historico_os %}
+                        <tr>
+                            <td class="ps-4">
+                                <a href="{{ url_for('os.detalhes', id=os.id) }}"
+                                    class="fw-bold text-decoration-none">#{{ os.numero_os }}</a>
+                                <div class="small text-muted">{{ os.data_abertura.strftime('%d/%m/%Y') }}</div>
+                            </td>
+                            <td><span class="badge bg-light text-dark border">{{ os.tipo_manutencao|capitalize }}</span>
+                            </td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 250px;"
+                                    title="{{ os.descricao_problema }}">
+                                    {{ os.descricao_problema }}
+                                </div>
+                                {% if os.descricao_solucao %}
+                                <div class="small text-success"><i class="bi bi-check2"></i> {{
+                                    os.descricao_solucao[:50] }}...</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span
+                                    class="badge bg-{{ 'success' if os.status == 'concluida' else 'warning' }} bg-opacity-10 text-dark">
+                                    {{ os.status|upper }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">Sem histórico registrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-bold py-3 border-bottom-0">Peças Substituídas</div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for mov in pecas %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-medium">{{ mov.estoque.nome }}</div>
+                            <small class="text-muted">{{ mov.data_movimentacao.strftime('%d/%m/%Y') }} (OS #{{
+                                mov.os.numero_os }})</small>
+                        </div>
+                        <span class="badge bg-secondary bg-opacity-10 text-dark">
+                            {{ "{:g}".format(mov.quantidade) }} {{ mov.estoque.unidade_medida }}
+                        </span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-muted text-center py-4">Nenhuma peça trocada neste equipamento.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
