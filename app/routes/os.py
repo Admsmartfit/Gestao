@@ -7,7 +7,7 @@ from app.models.estoque_models import OrdemServico, Estoque, CategoriaEstoque, E
 from app.models.terceirizados_models import Terceirizado, ChamadoExterno
 from app.services.os_service import OSService
 from app.services.estoque_service import EstoqueService
-
+from app.services.whatsapp_service import WhatsAppService # [Novo] Import
 
 bp = Blueprint('os', __name__, url_prefix='/os')
 
@@ -66,22 +66,21 @@ def detalhes(id):
     # Carregar todas as peças para o modal de solicitação
     todas_pecas = Estoque.query.order_by(Estoque.nome).all()
     
-    # [CORREÇÃO APLICADA AQUI]
     # Filtra terceirizados: Globais (abrangencia_global=True) OU que atendam a Unidade da OS
     terceirizados = Terceirizado.query.filter(
         (Terceirizado.abrangencia_global == True) | 
         (Terceirizado.unidades.any(id=os_obj.unidade_id))
     ).filter_by(ativo=True).order_by(Terceirizado.nome).all()
 
-    if not terceirizados:
-        # Apenas um aviso discreto se não houver ninguém, não impede o carregamento
-        pass 
+    # [Novo] Carrega usuários para o select de notificação na transferência
+    usuarios = Usuario.query.filter_by(ativo=True).order_by(Usuario.nome).all()
     
     return render_template('os_detalhes.html', 
                          os=os_obj, 
                          categorias=categorias,
                          todas_pecas=todas_pecas,
-                         terceirizados=terceirizados)
+                         terceirizados=terceirizados,
+                         usuarios=usuarios)
 
 @bp.route('/<int:id>/concluir', methods=['POST'])
 @login_required
@@ -367,7 +366,7 @@ def solicitar_compra():
     except Exception as e:
         return jsonify({'success': False, 'erro': str(e)}), 400
 
-# [NOVO] Solicitar Transferência entre Unidades
+# [MODIFICADO] Solicitar Transferência entre Unidades (com notificação)
 @bp.route('/api/estoque/transferir', methods=['POST'])
 @login_required
 def solicitar_transferencia():
@@ -377,6 +376,10 @@ def solicitar_transferencia():
         qtd = data.get('quantidade')
         unidade_origem_id = data.get('unidade_origem_id')
         unidade_destino_id = data.get('unidade_destino_id')
+        
+        # Novos campos para notificação
+        notificar_responsavel_id = data.get('notificar_responsavel_id')
+        enviar_whats = data.get('enviar_whats')
         
         if not all([estoque_id, qtd, unidade_origem_id, unidade_destino_id]):
              return jsonify({'success': False, 'erro': 'Dados incompletos'}), 400
@@ -394,6 +397,25 @@ def solicitar_transferencia():
             aprovacao_automatica=aprovacao_automatica
         )
         
+        # [Novo] Enviar notificação WhatsApp se solicitado
+        if enviar_whats and notificar_responsavel_id:
+            responsavel = Usuario.query.get(notificar_responsavel_id)
+            if responsavel and responsavel.telefone:
+                # Busca objetos para montar mensagem
+                item = Estoque.query.get(estoque_id)
+                origem = Unidade.query.get(unidade_origem_id)
+                destino = Unidade.query.get(unidade_destino_id)
+                
+                msg = (f"📦 *Solicitação de Transferência*\n\n"
+                       f"Item: {item.nome}\n"
+                       f"Qtd: {qtd} {item.unidade_medida}\n"
+                       f"De: {origem.nome}\n"
+                       f"Para: {destino.nome}\n\n"
+                       f"Solicitante: {current_user.nome}\n"
+                       f"Status: {solicitacao.status.upper()}")
+
+                WhatsAppService.enviar_mensagem(responsavel.telefone, msg)
+        
         msg = 'Transferência realizada com sucesso!' if solicitacao.status == 'concluida' else 'Solicitação criada'
         return jsonify({'success': True, 'msg': msg})
 
@@ -401,12 +423,7 @@ def solicitar_transferencia():
         return jsonify({'success': False, 'erro': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'erro': f"Erro interno: {str(e)}"}), 500
-    
-# FUTURO: 
-# - Implementar painel de aprovação de transferências
-# - Notificação para solicitante quando aprovado
 
-# --- ROTA QUE ESTAVA FALTANDO ---
 @bp.route('/api/equipamentos/filtro')
 @login_required
 def filtrar_equipamentos():

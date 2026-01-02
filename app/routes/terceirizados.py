@@ -1,10 +1,10 @@
-from app.models.terceirizados_models import HistoricoNotificacao # Certifique-se que já está importado
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime
 from app.extensions import db
 from app.models.terceirizados_models import Terceirizado, ChamadoExterno, HistoricoNotificacao
-from app.tasks import enviar_whatsapp_task  # Certifique-se de que app/tasks.py existe
+from app.models.estoque_models import OrdemServico
+from app.tasks import enviar_whatsapp_task
 
 bp = Blueprint('terceirizados', __name__, url_prefix='/terceirizados')
 
@@ -24,10 +24,9 @@ def listar_chamados():
     
     chamados = query.all()
     
-    # IMPORTANTE: Carrega a lista de prestadores para preencher o <select> do Modal
+    # Carrega a lista de prestadores para preencher o <select> do Modal
     lista_terceirizados = Terceirizado.query.filter_by(ativo=True).order_by(Terceirizado.nome).all()
     
-    # Passamos 'hoje' e 'terceirizados' explicitamente para evitar erros no template
     return render_template('chamados.html', 
                          chamados=chamados, 
                          terceirizados=lista_terceirizados,
@@ -40,6 +39,7 @@ def criar_chamado():
         # Validação básica
         prazo_str = request.form.get('prazo')
         terceirizado_id = request.form.get('terceirizado_id')
+        enviar_whats = request.form.get('enviar_whatsapp') == 'on' # Checkbox do formulário
         
         if not prazo_str or not terceirizado_id:
             raise ValueError("Preencha todos os campos obrigatórios.")
@@ -68,31 +68,44 @@ def criar_chamado():
         db.session.add(novo_chamado)
         db.session.commit()
         
-        # Prepara a mensagem de WhatsApp (Template do PRD)
-        msg = (f"🔧 *Novo Chamado GMM*\n\n"
-               f"Chamado: {novo_chamado.numero_chamado}\n"
-               f"Título: {novo_chamado.titulo}\n"
-               f"Prazo: {prazo.strftime('%d/%m %H:%M')}\n\n"
-               f"Descrição: {novo_chamado.descricao}")
-        
-        # Registra no Histórico de Notificações
-        notif = HistoricoNotificacao(
-            chamado_id=novo_chamado.id,
-            tipo='criacao',
-            destinatario=terceirizado.telefone,
-            mensagem=msg,
-            status_envio='pendente'
-        )
-        db.session.add(notif)
-        db.session.commit()
-        
-        # Envia para a fila do Celery (Assíncrono)
-        try:
-            enviar_whatsapp_task.delay(notif.id, notif.destinatario, notif.mensagem)
-            flash('Chamado criado e notificação enviada para fila de envio.', 'success')
-        except Exception as e:
-            # Se o Redis/Celery estiver fora, não quebra o sistema, apenas avisa
-            flash(f'Chamado criado, mas erro ao agendar envio: {str(e)}', 'warning')
+        # Lógica de Envio de WhatsApp
+        if enviar_whats:
+            detalhes_os = ""
+            if novo_chamado.os_id:
+                os_origem = OrdemServico.query.get(novo_chamado.os_id)
+                if os_origem:
+                    equipamento = os_origem.equipamento_rel.nome if os_origem.equipamento_rel else 'Geral'
+                    detalhes_os = (
+                        f"\n📋 *Dados da OS #{os_origem.numero_os}*\n"
+                        f"Local: {os_origem.unidade.nome}\n"
+                        f"Endereço: {os_origem.unidade.endereco or 'Não informado'}\n"
+                        f"Equipamento: {equipamento}\n"
+                    )
+
+            msg = (f"🔧 *Solicitação de Serviço GMM*\n\n"
+                   f"Chamado: {novo_chamado.numero_chamado}\n"
+                   f"Título: {novo_chamado.titulo}\n"
+                   f"Prazo: {prazo.strftime('%d/%m %H:%M')}\n"
+                   f"{detalhes_os}\n"
+                   f"📝 *Descrição:*\n{novo_chamado.descricao}")
+            
+            # Registra no Histórico
+            notif = HistoricoNotificacao(
+                chamado_id=novo_chamado.id,
+                tipo='criacao',
+                destinatario=terceirizado.telefone,
+                mensagem=msg,
+                status_envio='pendente',
+                direcao='outbound'
+            )
+            db.session.add(notif)
+            db.session.commit()
+            
+            # Envia assíncrono
+            enviar_whatsapp_task.delay(notif.id)
+            flash('Chamado criado e notificação enviada.', 'success')
+        else:
+            flash('Chamado criado com sucesso.', 'success')
         
     except ValueError as ve:
         db.session.rollback()
@@ -106,7 +119,7 @@ def criar_chamado():
 @bp.route('/chamados/<int:id>', methods=['GET'])
 @login_required
 def detalhes_chamado(id):
-    """Exibe detalhes e timeline de comunicação do chamado (RF-005)"""
+    """Exibe detalhes e timeline de comunicação do chamado"""
     chamado = ChamadoExterno.query.get_or_404(id)
     
     # Carregar histórico de mensagens (ordenado por data)
@@ -125,26 +138,60 @@ def cobrar_terceirizado(id):
     """
     chamado = ChamadoExterno.query.get_or_404(id)
     
-    # Template de Cobrança (PRD)
     msg = (f"⏰ *Prazo Vencido*\n\n"
            f"Chamado: {chamado.numero_chamado}\n"
            f"Título: {chamado.titulo}\n"
            f"Previsão de conclusão?")
     
-    # Registra notificação
     notif = HistoricoNotificacao(
         chamado_id=chamado.id,
         tipo='cobranca',
         destinatario=chamado.terceirizado.telefone,
         mensagem=msg,
-        status_envio='pendente'
+        status_envio='pendente',
+        direcao='outbound'
     )
     db.session.add(notif)
     db.session.commit()
     
-    # Envia assincronamente
     try:
-        enviar_whatsapp_task.delay(notif.id, notif.destinatario, notif.mensagem)
+        enviar_whatsapp_task.delay(notif.id)
         return jsonify({'success': True, 'msg': 'Cobrança enviada com sucesso!'})
     except Exception as e:
         return jsonify({'success': False, 'msg': f'Erro ao enviar: {str(e)}'}), 500
+
+@bp.route('/chamados/<int:id>/responder', methods=['POST'])
+@login_required
+def responder_manual(id):
+    """
+    Permite enviar mensagem manual no chat do chamado.
+    """
+    chamado = ChamadoExterno.query.get_or_404(id)
+    mensagem = request.form.get('mensagem')
+    
+    if not mensagem:
+        return jsonify({'success': False, 'msg': 'Mensagem vazia.'}), 400
+
+    try:
+        notif = HistoricoNotificacao(
+            chamado_id=chamado.id,
+            tipo='manual_outbound',
+            remetente=current_user.nome,
+            destinatario=chamado.terceirizado.telefone,
+            mensagem=mensagem,
+            status_envio='pendente',
+            direcao='outbound'
+        )
+        db.session.add(notif)
+        db.session.commit()
+        
+        enviar_whatsapp_task.delay(notif.id)
+        
+        return jsonify({
+            'success': True, 
+            'msg': 'Mensagem enviada!',
+            'data': datetime.utcnow().strftime('%H:%M'),
+            'texto': mensagem
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500

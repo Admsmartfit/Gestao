@@ -148,4 +148,56 @@
         }
     }
 </script>
+
+<div class="p-3 bg-white border-top">
+    <form id="formChat" onsubmit="enviarMensagemManual(event)">
+        <div class="input-group">
+            <input type="text" id="inputMsgManual" class="form-control bg-light"
+                placeholder="Digite uma mensagem para o prestador..." required>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function enviarMensagemManual(e) {
+        e.preventDefault();
+        const input = document.getElementById('inputMsgManual');
+        const msg = input.value;
+        const btn = e.target.querySelector('button');
+
+        btn.disabled = true;
+
+        fetch(`/terceirizados/chamados/{{ chamado.id }}/responder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `mensagem=${encodeURIComponent(msg)}`
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Adiciona balão no chat dinamicamente
+                    const chatContainer = document.getElementById('chatContainer');
+                    const html = `
+                <div class="d-flex mb-3 justify-content-end">
+                    <div class="card border-0 shadow-sm chat-bubble chat-outbound">
+                        <div class="card-body p-2 px-3">
+                            <div class="small mb-1 text-dark" style="white-space: pre-wrap;">${data.texto}</div>
+                            <div class="d-flex align-items-center justify-content-end gap-1 opacity-50" style="font-size: 0.65rem;">
+                                <span>${data.data}</span>
+                                <i class="bi bi-check2"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                    chatContainer.insertAdjacentHTML('beforeend', html);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    input.value = '';
+                } else {
+                    alert('Erro: ' + data.msg);
+                }
+            })
+            .finally(() => btn.disabled = false);
+    }
+</script>
 {% endblock %}

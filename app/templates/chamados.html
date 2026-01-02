@@ -102,7 +102,12 @@
         </div>
     </div>
 </div>
-
+<div class="mb-3 form-check">
+    <input type="checkbox" class="form-check-input" name="enviar_whatsapp" id="checkWhatsApp" checked>
+    <label class="form-check-label" for="checkWhatsApp">
+        <i class="bi bi-whatsapp text-success me-1"></i> Notificar prestador via WhatsApp com detalhes da OS
+    </label>
+</div>
 <div class="modal fade" id="modalNovoChamado" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content border-0 shadow-lg" action="{{ url_for('terceirizados.criar_chamado') }}"
